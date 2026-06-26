@@ -1,0 +1,20 @@
+[project]
+name = "charr"
+version = "0.1.0"
+description = "A checker for charts: lint rendered chart images against a configurable rule set using (local) LLMs."
+requires-python = ">=3.13"
+license = "MIT"
+authors = [{ name = "Michiel Van Herwegen", email = "michiel@vanherwegen.com" }]
+# Keep dependencies minimal: only big, high-value libraries, added when first
+# used. Expected first runtime dep is pydantic (structured LLM output).
+dependencies = []
+
+[project.scripts]
+charr = "charr.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charr"]

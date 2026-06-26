@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run pyright
+
+      - name: Markdown format
+        run: uv run mdformat --check $(git ls-files '*.md')
+
+      - name: ASCII only
+        run: |
+          matches=$(git ls-files -z '*.py' '*.md' | xargs -0 grep -nP '[^\x00-\x7F]' || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo 'Non-ASCII characters found (see above); use ASCII only.'
+            exit 1
+          fi
+
+      - name: Tests
+        run: uv run pytest
