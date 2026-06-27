@@ -7,6 +7,7 @@ client), and the concrete client takes an injected ``requests.Session``, so test
 
 import base64
 from collections.abc import Mapping, Sequence
+from http import HTTPStatus
 from pathlib import Path
 from typing import Protocol
 
@@ -17,6 +18,8 @@ from charr.config import Config, LlmSettings
 from charr.models import IMAGE_MIME_BY_SUFFIX, CharrError, Rule, RuleVerdict
 
 DEFAULT_TIMEOUT_SECONDS = 120.0
+# Cap how much of an error response body we echo, so a stray HTML error page does not flood the message.
+ERROR_BODY_LIMIT = 2000
 
 _SYSTEM_PROMPT = (
   "You are Charr, a strict checker for chart images. Judge only what is visible in the image. For each rule, decide "
@@ -146,7 +149,7 @@ class OpenAiCompatClient:
     payload: dict[str, object] = {
       "model": self._settings.model,
       "temperature": 0,
-      "response_format": {"type": "json_object"},
+      "response_format": _response_format(),
       "messages": build_messages(image, rules, config),
     }
     headers = {"Content-Type": "application/json"}
@@ -155,15 +158,37 @@ class OpenAiCompatClient:
     url = f"{self._settings.base_url}/chat/completions"
     try:
       response = self._session.post(url, json=payload, headers=headers, timeout=self._timeout)
-      response.raise_for_status()
-      raw = response.json()
     except requests.RequestException as exc:
       msg = f"LLM request to {url} failed: {exc}"
+      raise LlmError(msg) from exc
+    if response.status_code >= HTTPStatus.BAD_REQUEST:
+      body = response.text.strip()[:ERROR_BODY_LIMIT]
+      msg = f"LLM request to {url} returned HTTP {response.status_code}: {body}"
+      raise LlmError(msg)
+    try:
+      raw = response.json()
+    except ValueError as exc:
+      msg = f"LLM response from {url} was not valid JSON: {exc}"
       raise LlmError(msg) from exc
     if not isinstance(raw, dict):
       msg = "LLM response was not a JSON object"
       raise LlmError(msg)
     return parse_chat_completion(raw)
+
+
+def _response_format() -> dict[str, object]:
+  """Build the ``response_format`` asking the backend to return JSON matching ``CheckResponse``.
+
+  Uses ``json_schema`` (structured outputs) rather than ``json_object``: it is what OpenAI-compatible servers like LM
+  Studio require (they reject ``json_object``), is supported by Ollama/vLLM/llama.cpp, and constrains the model to our
+  exact shape.
+
+  :return: An OpenAI-compatible ``response_format`` object carrying the ``CheckResponse`` JSON schema.
+  """
+  return {
+    "type": "json_schema",
+    "json_schema": {"name": "charr_report", "schema": CheckResponse.model_json_schema()},
+  }
 
 
 def _rules_block(rules: Sequence[Rule], config: Config) -> str:

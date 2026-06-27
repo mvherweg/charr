@@ -46,12 +46,8 @@ def _user_text_and_image_url(messages: list[dict[str, object]]) -> tuple[str, st
 class _FakeResponse:
   def __init__(self, payload: object, *, status: int = 200) -> None:
     self._payload = payload
-    self._status = status
-
-  def raise_for_status(self) -> None:
-    if self._status >= 400:  # noqa: PLR2004 - HTTP error threshold is well known
-      msg = f"status {self._status}"
-      raise requests.HTTPError(msg)
+    self.status_code = status
+    self.text = json.dumps(payload)
 
   def json(self) -> object:
     return self._payload
@@ -65,6 +61,11 @@ class _FakeSession:
   def post(self, url: str, *, json: object, headers: dict[str, str], timeout: float) -> _FakeResponse:
     self._captured.update(url=url, body=json, headers=headers, timeout=timeout)
     return _FakeResponse(self._payload)
+
+
+class _ErrorSession:
+  def post(self, *_args: object, **_kwargs: object) -> _FakeResponse:
+    return _FakeResponse({"error": "'response_format.type' must be 'json_schema' or 'text'"}, status=400)
 
 
 class _RaisingSession:
@@ -148,7 +149,9 @@ def test_openai_compat_client_posts_to_chat_completions_and_parses_results_with_
   body = captured["body"]
   assert isinstance(body, dict)
   assert body["model"] == "vlm"
-  assert body["response_format"] == {"type": "json_object"}
+  response_format = body["response_format"]
+  assert isinstance(response_format, dict)
+  assert response_format["type"] == "json_schema"
 
 
 def test_openai_compat_client_sends_authorization_header_only_when_api_key_present(
@@ -185,4 +188,16 @@ def test_openai_compat_client_wraps_transport_errors_as_llm_error(
   session = cast("requests.Session", _RaisingSession())
   client = OpenAiCompatClient(LlmSettings(base_url="http://host/v1", api_key=None, model="m"), session=session)
   with pytest.raises(LlmError):
+    client.check_image(image=image, rules=rules, config=Config())
+
+
+def test_openai_compat_client_surfaces_the_error_body_on_an_http_error(
+  tmp_path: Path,
+  make_image: Callable[[Path], Path],
+) -> None:
+  rules = select_enabled_rules(["has-title"], [])
+  image = make_image(tmp_path / "c.png")
+  session = cast("requests.Session", _ErrorSession())
+  client = OpenAiCompatClient(LlmSettings(base_url="http://host/v1", api_key=None, model="m"), session=session)
+  with pytest.raises(LlmError, match="json_schema"):
     client.check_image(image=image, rules=rules, config=Config())

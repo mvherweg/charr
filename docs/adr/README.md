@@ -32,3 +32,4 @@ always-on conventions ("how to write code here"), and [project.md](../../project
 | 0005 | [Credentials via environment variables; three-way exit codes](0005-env-vars-and-exit-codes.md)             | Accepted |
 | 0006 | [Enable GFM tables in mdformat via the mdformat-tables plugin](0006-mdformat-tables-for-gfm-tables.md)     | Accepted |
 | 0007 | [Markdown formatting uses wrap=keep, not auto-wrap to 120](0007-markdown-wrap-keep.md)                     | Accepted |
+| 0008 | [Request structured output via json_schema, not json_object](0008-json-schema-response-format.md)          | Accepted |
