@@ -11,6 +11,10 @@ dev = [
   "ruff>=0.6",
   "pyright>=1.1",
   "mdformat>=0.7",
+  # GFM table support for mdformat (auto-discovered as a plugin); tables are used in docs.
+  "mdformat-tables>=1",
+  # Type stubs for requests (which ships no inline types) so pyright stays clean.
+  "types-requests>=2.31",
 ]
 
 [tool.ruff]
@@ -19,9 +23,16 @@ line-length = 120
 indent-width = 2
 
 [tool.ruff.lint]
-# Project policy: enable everything, then silence case by case inline with
-# `# noqa: <code>`. Do not add broad global ignores here.
+# Project policy: enable everything, then silence findings case by case inline with `# noqa: <code>`. The only entries
+# in `ignore` are rules Ruff cannot satisfy under `select = ["ALL"]` (it emits a warning on each run otherwise): the
+# discarded half of each conflicting docstring pair, and COM812 which conflicts with the formatter. These are conflict
+# resolutions, not a way to dodge findings. See docs/adr/0009.
 select = ["ALL"]
+ignore = [
+  "D203",   # conflicts with D211; we keep D211 (no blank line before a class docstring)
+  "D213",   # conflicts with D212; we keep D212 (multi-line summary starts on the first line)
+  "COM812", # trailing-comma rule conflicts with the formatter, which already manages commas
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests are the one sanctioned relaxation: bare asserts are how pytest works,

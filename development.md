@@ -11,13 +11,48 @@ How to set up, build, run, and contribute to Charr. For what Charr is and why, s
   no Unicode arrows or math symbols (write `<=`, `->`).
 - **Python 3.13+**, full new-style type hints (`X | None`, never `Optional`).
 - **uv** (Astral) for everything: environments, dependencies, running tools.
-- **Ruff** strict: all rules on, disabled case by case inline with `# noqa`.
+- **Ruff** strict: all rules on, disabled case by case inline with `# noqa` (such a line may exceed 120 - Ruff does
+  not flag E501 on `# noqa` lines, leaving room for the reason).
 - **pyright** for type checking; everything is fully type-hinted.
 - **pytest** for tests, with long descriptive test names.
-- Line length **120** for code and markdown alike (links may force exceptions); **2-space indent** (not 4).
+- Line length **120** for code (Ruff-enforced). For markdown prose it is a soft, by-hand target (`wrap = "keep"` means
+  mdformat does not auto-wrap): a little over is fine, and tables/links may exceed. **2-space indent** (not 4).
 - Prefer **fewer, larger, coherent files** over many tiny ones.
+- **Public code first:** within a file, put the public API (entry points, the functions/classes callers use) at the top
+  and private `_helpers` below the code that uses them. The top of the file is the natural place to start reading. Safe
+  in Python since module-level names resolve at call time, so a public function may call a `_helper` defined lower.
+- **Docstrings:** public (no leading underscore) functions, methods, and classes use reStructuredText (Sphinx) style -
+  `:param:` / `:return:`, no `:type:` / `:rtype:` (type hints carry the types). Private (underscore) code may skip it.
+  Tests are exempt, but public test helpers/fixtures are not. See [Docstrings](#docstrings).
 - **Pre-1.0 (0.x):** clean design beats backwards compatibility. Break the public API when it makes the design better,
   but do it consciously and note how callers adapt.
+
+## Docstrings
+
+Public functions, methods, and classes - "public" meaning the Python convention of no leading underscore - use
+reStructuredText (Sphinx) docstrings: a one-line imperative summary, a blank line, then a `:param <name>:` for each
+argument and a `:return:` for the result. Omit a field when there is nothing to document (no arguments, or the function
+returns `None`); add `:raises <Error>:` where raising is part of the contract. Do not use `:type:` or `:rtype:` - the
+type hints carry the types.
+
+```
+def add_absolutes(number_one: int, number_two: int) -> int:
+  """Add the absolute values of two integers.
+
+  :param number_one: First number in the addition.
+  :param number_two: Second number in the addition.
+  :return: The sum of the absolute values of both numbers.
+  """
+  return abs(number_one) + abs(number_two)
+```
+
+Private (underscore-prefixed) functions, methods, and classes do not need a docstring. If one is present it may be plain
+descriptive prose or the same Sphinx style, but it must not introduce a different convention (no Google or NumPy style).
+Data-model classes (e.g. pydantic models) may keep a descriptive class docstring rather than documenting each field.
+
+Tests are exempt: a `test_*` function is documented by its long descriptive name, not a docstring. Test *helpers* are
+not exempt - a python-public (non-underscore) helper or fixture built for tests follows the same Sphinx rule, while
+underscore-prefixed test helpers do not.
 
 ## Prerequisites
 
@@ -48,11 +83,19 @@ Charr/
       tests/
   project.md
   development.md
+  docs/adr/                 # Architecture Decision Records (committed; the "why" trace)
   dev-recs/                 # source recordings + transcripts (not shipped)
 ```
 
 The two packages are kept apart on purpose: a user of the checker is not necessarily interested in generating benchmark
 data, and vice versa.
+
+## Decisions (ADRs)
+
+Non-obvious design choices are recorded as Architecture Decision Records under [docs/adr/](docs/adr/README.md): one
+decision per file, with its context, the alternatives, and the consequences we accepted. Read them for "why is it this
+way"; this file and [AGENTS.md](AGENTS.md) hold the always-on conventions. When you make a design choice with real
+alternatives, copy `docs/adr/0000-template.md` to the next number and add it to the index.
 
 ## Setup
 
@@ -65,28 +108,29 @@ uv sync
 
 ## Running the tools
 
-Names below are proposed; adjust once the CLIs exist.
+The chart checker is implemented; the data generator is not yet.
 
 ```
-# run the chart checker over a folder of images, get JSON on stdout
+# run the chart checker over a folder of images (non-recursive), JSON on stdout
 uv run charr check ./charts
 
-# point at globs or single files too
-uv run charr check "reports/**/*.png" one-off.jpg
+# point at single files or a simple glob too (no ** recursion yet)
+uv run charr check report.png "charts/*.png"
 
-# data generator: emit synthetic charts with ground-truth labels for benchmarking
+# data generator: not implemented yet
 uv run charr-datagen ...
 ```
 
-The checker prints **JSON only** and exits **non-zero when any enabled, non-excepted rule fails**, so it can gate CI or
-be driven by an agent.
+The checker prints **JSON only** and exits **non-zero when any enabled, non-excepted rule fails** (1 = a rule failed,
+2 = could not run), so it can gate CI or be driven by an agent.
 
 ## Configuration and credentials
 
 - **Config file:** TOML. The checker reads `[tool.charr]` from `pyproject.toml` and/or a standalone `charr.toml`,
   discovered by walking **up** from the working directory. CLI flags override config.
-- **Credentials and endpoint:** LLM settings come from **environment variables** (proposed names: the API base URL, API
-  key, and model id). Keep keys out of the repo and out of config files.
+- **Credentials and endpoint:** LLM settings come from **environment variables**: `CHARR_LLM_BASE_URL` (the API root,
+  including any version prefix, e.g. `http://localhost:11434/v1`), `CHARR_LLM_MODEL`, and the optional
+  `CHARR_LLM_API_KEY`. Keep keys out of the repo and out of config files.
 
 A minimal `charr.toml` might look like (illustrative):
 
@@ -105,15 +149,23 @@ uv run ruff format .          # format
 ```
 
 Policy: **enable all Ruff rules**, then silence on a case-by-case basis **inline** with `# noqa: <code>` (with a reason
-where it helps), rather than broadly disabling rules in config.
+where it helps), rather than broadly disabling rules in config. The one global `lint.ignore` holds only Ruff's own
+unsatisfiable rule conflicts (the discarded half of `D203`/`D211` and `D212`/`D213`, plus `COM812`, which conflicts with
+the formatter); see [docs/adr/0009](docs/adr/0009-resolve-ruff-rule-conflicts-in-config.md). It is not for dodging
+findings.
 
 Tests are the one place rules are relaxed: notably the ban on `assert` (asserts are how pytest works) and the
 public-method docstring requirement. Configure those relaxations scoped to the tests path.
 
 ## Markdown
 
-Markdown is formatted with mdformat (config in `.mdformat.toml`: wrap to 120, sequential list numbering). Unbreakable
-tokens such as links may exceed 120.
+Markdown is formatted with mdformat (config in `.mdformat.toml`: `wrap = "keep"`, sequential list numbering). With
+`wrap = "keep"`, mdformat does not reflow prose, so editing a sentence no longer rewraps the whole paragraph; wrap
+prose by hand, aiming for 120 (see [docs/adr/0007](docs/adr/0007-markdown-wrap-keep.md)). 120 is a soft target to
+limit horizontal scrolling and match our code width, not a hard rule: a little over is fine, and unbreakable content
+(tables, long links) may exceed it. GFM pipe tables are supported
+via the `mdformat-tables` plugin (a dev dependency, auto-discovered by mdformat); without it mdformat would reflow a
+table into prose, so keep the plugin in the dev group (see [docs/adr/0006](docs/adr/0006-mdformat-tables-for-gfm-tables.md)).
 
 ```
 uv run mdformat $(git ls-files '*.md')           # format in place
@@ -142,7 +194,8 @@ uv run pytest packages/charr  # one package
 ## Checks and CI
 
 There are no forced local hooks (no pre-commit, no pre-push). Run checks locally whenever useful, in any subset, for
-maximum flexibility. The gate is the pull request: CI runs the full set on every PR and must pass.
+maximum flexibility. The gate is the pull request: CI runs the full set on every push to the PR, and the latest commit
+must be green.
 
 CI (GitHub Actions, `.github/workflows/ci.yml`) runs, after `uv sync`:
 
@@ -177,8 +230,12 @@ uv add --dev <pkg>            # dev-only dep
 
 **Handling a review:**
 
-- Address **every** review point. For each, either act on it and resolve as suggested, or reply on the thread explaining
-  why you believe it should not be done.
+- A new PR automatically gets a **GitHub Copilot review** (via a repository ruleset). Triage it: fix the points you
+  judge valid, and reply on the thread to the ones you judge invalid, explaining why. Copilot reviews **once per PR** -
+  it is not re-triaged on later pushes.
+- Address **every** review point (Copilot or human): either act on it and resolve as suggested, or reply on the thread
+  explaining why you believe it should not be done.
+- Every new commit pushed to the PR re-runs CI; confirm it is green again on the new head commit before handing back.
 - There is **no second automated round**. Once all points are addressed, alert the human reviewer.
 - The human then reviews and either comes back with additional points to discuss, or merges (at which point the item is
   done).
