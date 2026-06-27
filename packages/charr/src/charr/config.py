@@ -97,15 +97,17 @@ def load_config(
   :param disable: Extra rule ids to disable, applied over the file's selection.
   :param config_path: Explicit config file to use instead of discovery.
   :return: The resolved configuration.
-  :raises ConfigError: If the discovered or given config is malformed.
+  :raises ConfigError: If the config file is missing/unreadable or malformed (incl. an explicit ``config_path``).
   """
-  path = config_path if config_path is not None else discover_config_file(start)
-  table = _charr_table(path) if path is not None else {}
+  path: Path | None = config_path
   try:
+    if path is None:
+      path = discover_config_file(start)
+    table = _charr_table(path) if path is not None else {}
     config = Config.model_validate(table)
-  except (tomllib.TOMLDecodeError, ValueError) as exc:
+  except (OSError, tomllib.TOMLDecodeError, ValueError) as exc:
     source = str(path) if path is not None else "<defaults>"
-    msg = f"invalid Charr config in {source}: {exc}"
+    msg = f"could not load Charr config from {source}: {exc}"
     raise ConfigError(msg) from exc
   merged = RuleSelection(
     enable=_dedup([*config.rules.enable, *(enable or [])]),

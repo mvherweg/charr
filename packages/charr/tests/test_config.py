@@ -41,6 +41,17 @@ def test_load_config_rejects_unknown_config_keys(tmp_path: Path) -> None:
     load_config(tmp_path)
 
 
+def test_load_config_raises_config_error_for_a_missing_explicit_config_path(tmp_path: Path) -> None:
+  with pytest.raises(ConfigError):
+    load_config(tmp_path, config_path=tmp_path / "does-not-exist.toml")
+
+
+def test_load_config_raises_config_error_for_malformed_toml(tmp_path: Path) -> None:
+  (tmp_path / "charr.toml").write_text("[unterminated section\n")
+  with pytest.raises(ConfigError):
+    load_config(tmp_path)
+
+
 def test_load_llm_settings_reads_endpoint_and_strips_a_trailing_slash() -> None:
   settings = load_llm_settings(
     {"CHARR_LLM_BASE_URL": "http://localhost:11434/v1/", "CHARR_LLM_MODEL": "qwen2-vl"},
