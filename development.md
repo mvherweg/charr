@@ -194,7 +194,8 @@ uv run pytest packages/charr  # one package
 ## Checks and CI
 
 There are no forced local hooks (no pre-commit, no pre-push). Run checks locally whenever useful, in any subset, for
-maximum flexibility. The gate is the pull request: CI runs the full set on every PR and must pass.
+maximum flexibility. The gate is the pull request: CI runs the full set on every push to the PR, and the latest commit
+must be green.
 
 CI (GitHub Actions, `.github/workflows/ci.yml`) runs, after `uv sync`:
 
@@ -229,8 +230,12 @@ uv add --dev <pkg>            # dev-only dep
 
 **Handling a review:**
 
-- Address **every** review point. For each, either act on it and resolve as suggested, or reply on the thread explaining
-  why you believe it should not be done.
+- A new PR automatically gets a **GitHub Copilot review** (via a repository ruleset). Triage it: fix the points you
+  judge valid, and reply on the thread to the ones you judge invalid, explaining why. Copilot reviews **once per PR** -
+  it is not re-triaged on later pushes.
+- Address **every** review point (Copilot or human): either act on it and resolve as suggested, or reply on the thread
+  explaining why you believe it should not be done.
+- Every new commit pushed to the PR re-runs CI; confirm it is green again on the new head commit before handing back.
 - There is **no second automated round**. Once all points are addressed, alert the human reviewer.
 - The human then reviews and either comes back with additional points to discuss, or merges (at which point the item is
   done).
