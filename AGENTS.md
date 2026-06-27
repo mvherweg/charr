@@ -28,8 +28,9 @@ Run these locally when practical; CI runs the full set on every PR:
   mdformat does not auto-wrap): a little over is fine; tables and links may exceed. **2-space indent** (not 4).
 - Full type hints, new-style (`X | None`, never `Optional`).
 - Ruff: all rules enabled; silence case by case **inline** with `# noqa: <code>` (such a line may exceed 120 - Ruff
-  does not flag E501 on noqa lines, so the reason has room). Do not add global ignores (tests are the only sanctioned
-  exception, already configured).
+  does not flag E501 on noqa lines, so the reason has room). Do not add global ignores to dodge findings; the only
+  `lint.ignore` entries are Ruff's own unsatisfiable rule conflicts (D203/D213, COM812; see docs/adr/0009), plus the
+  test relaxations already in per-file-ignores.
 - Prefer fewer, larger, coherent files over many tiny ones.
 - Public code first: within a file, put the public API at the top and private `_helpers` below the code that uses them.
 - Docstrings: public (no leading underscore) functions, methods, and classes use reStructuredText (Sphinx) style

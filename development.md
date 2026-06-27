@@ -149,7 +149,10 @@ uv run ruff format .          # format
 ```
 
 Policy: **enable all Ruff rules**, then silence on a case-by-case basis **inline** with `# noqa: <code>` (with a reason
-where it helps), rather than broadly disabling rules in config.
+where it helps), rather than broadly disabling rules in config. The one global `lint.ignore` holds only Ruff's own
+unsatisfiable rule conflicts (the discarded half of `D203`/`D211` and `D212`/`D213`, plus `COM812`, which conflicts with
+the formatter); see [docs/adr/0009](docs/adr/0009-resolve-ruff-rule-conflicts-in-config.md). It is not for dodging
+findings.
 
 Tests are the one place rules are relaxed: notably the ban on `assert` (asserts are how pytest works) and the
 public-method docstring requirement. Configure those relaxations scoped to the tests path.

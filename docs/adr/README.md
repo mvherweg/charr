@@ -33,3 +33,4 @@ always-on conventions ("how to write code here"), and [project.md](../../project
 | 0006 | [Enable GFM tables in mdformat via the mdformat-tables plugin](0006-mdformat-tables-for-gfm-tables.md)     | Accepted |
 | 0007 | [Markdown formatting uses wrap=keep, not auto-wrap to 120](0007-markdown-wrap-keep.md)                     | Accepted |
 | 0008 | [Request structured output via json_schema, not json_object](0008-json-schema-response-format.md)          | Accepted |
+| 0009 | [Resolve Ruff's unsatisfiable rule conflicts in config](0009-resolve-ruff-rule-conflicts-in-config.md)     | Accepted |
