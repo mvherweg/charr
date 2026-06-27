@@ -1,7 +1,9 @@
 # AGENTS.md
 
 Charr: a CLI checker that lints chart images against a rule set using (local) LLMs. Context: see
-[project.md](project.md) (what and why) and [development.md](development.md) (setup, layout, workflow).
+[project.md](project.md) (what and why) and [development.md](development.md) (setup, layout, workflow). For why things
+are the way they are (decisions with alternatives and consequences), see the Architecture Decision Records in
+[docs/adr/](docs/adr/README.md); record a new ADR when you make a non-obvious design choice.
 
 ## Environment
 
@@ -22,11 +24,18 @@ Run these locally when practical; CI runs the full set on every PR:
 ## Code style
 
 - **ASCII only** in all markdown and code. No em-dashes, emoji, smart quotes, or non-ASCII symbols (write `<=`, `->`).
-- Line length **120** for code and markdown alike (links may force exceptions). **2-space indent** (not 4).
+- Line length **120** for code (Ruff-enforced). For markdown prose it is a soft, by-hand target (`wrap = "keep"` means
+  mdformat does not auto-wrap): a little over is fine; tables and links may exceed. **2-space indent** (not 4).
 - Full type hints, new-style (`X | None`, never `Optional`).
-- Ruff: all rules enabled; silence case by case **inline** with `# noqa: <code>`. Do not add global ignores (tests are
-  the only sanctioned exception, already configured).
+- Ruff: all rules enabled; silence case by case **inline** with `# noqa: <code>` (such a line may exceed 120 - Ruff
+  does not flag E501 on noqa lines, so the reason has room). Do not add global ignores (tests are the only sanctioned
+  exception, already configured).
 - Prefer fewer, larger, coherent files over many tiny ones.
+- Public code first: within a file, put the public API at the top and private `_helpers` below the code that uses them.
+- Docstrings: public (no leading underscore) functions, methods, and classes use reStructuredText (Sphinx) style
+  (`:param:` / `:return:`, no `:type:` / `:rtype:`; type hints carry the types). Private (underscore) code may skip it;
+  if present, keep it descriptive or Sphinx, never a different convention. Tests are exempt, but python-public test
+  helpers/fixtures are not. See [development.md](development.md) for the rule and an example.
 - Dependencies: minimal and MIT-compatible; avoid GPL. Add a dep only when first used.
 
 ## Tests
