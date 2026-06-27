@@ -108,28 +108,29 @@ uv sync
 
 ## Running the tools
 
-Names below are proposed; adjust once the CLIs exist.
+The chart checker is implemented; the data generator is not yet.
 
 ```
-# run the chart checker over a folder of images, get JSON on stdout
+# run the chart checker over a folder of images (non-recursive), JSON on stdout
 uv run charr check ./charts
 
-# point at globs or single files too
-uv run charr check "reports/**/*.png" one-off.jpg
+# point at single files or a simple glob too (no ** recursion yet)
+uv run charr check report.png "charts/*.png"
 
-# data generator: emit synthetic charts with ground-truth labels for benchmarking
+# data generator: not implemented yet
 uv run charr-datagen ...
 ```
 
-The checker prints **JSON only** and exits **non-zero when any enabled, non-excepted rule fails**, so it can gate CI or
-be driven by an agent.
+The checker prints **JSON only** and exits **non-zero when any enabled, non-excepted rule fails** (1 = a rule failed,
+2 = could not run), so it can gate CI or be driven by an agent.
 
 ## Configuration and credentials
 
 - **Config file:** TOML. The checker reads `[tool.charr]` from `pyproject.toml` and/or a standalone `charr.toml`,
   discovered by walking **up** from the working directory. CLI flags override config.
-- **Credentials and endpoint:** LLM settings come from **environment variables** (proposed names: the API base URL, API
-  key, and model id). Keep keys out of the repo and out of config files.
+- **Credentials and endpoint:** LLM settings come from **environment variables**: `CHARR_LLM_BASE_URL` (the API root,
+  including any version prefix, e.g. `http://localhost:11434/v1`), `CHARR_LLM_MODEL`, and the optional
+  `CHARR_LLM_API_KEY`. Keep keys out of the repo and out of config files.
 
 A minimal `charr.toml` might look like (illustrative):
 
