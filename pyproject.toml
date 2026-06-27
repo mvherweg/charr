@@ -11,6 +11,10 @@ dev = [
   "ruff>=0.6",
   "pyright>=1.1",
   "mdformat>=0.7",
+  # GFM table support for mdformat (auto-discovered as a plugin); tables are used in docs.
+  "mdformat-tables>=1",
+  # Type stubs for requests (which ships no inline types) so pyright stays clean.
+  "types-requests>=2.31",
 ]
 
 [tool.ruff]

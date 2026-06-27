@@ -6,8 +6,12 @@ requires-python = ">=3.13"
 license = "MIT"
 authors = [{ name = "Michiel Van Herwegen", email = "michiel@vanherwegen.com" }]
 # Keep dependencies minimal: only big, high-value libraries, added when first
-# used. Expected first runtime dep is pydantic (structured LLM output).
-dependencies = []
+# used. pydantic validates the model's structured JSON output and our config;
+# requests makes the one OpenAI-compatible /chat/completions call per image.
+dependencies = [
+  "pydantic>=2",
+  "requests>=2",
+]
 
 [project.scripts]
 charr = "charr.cli:main"

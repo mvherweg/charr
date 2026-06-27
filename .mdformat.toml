@@ -1,5 +1,6 @@
 # Markdown formatting config, shared by local runs and CI.
-# wrap: hard-wrap prose to 120 (unbreakable tokens like links may exceed).
+# wrap: "keep" leaves existing line breaks alone (no prose reflow), so editing one sentence does not rewrap a whole
+#   paragraph. Wrap prose by hand, aiming for 120. See docs/adr/0007.
 # number: use sequential 1. 2. 3. numbering for ordered lists.
-wrap = 120
+wrap = "keep"
 number = true
