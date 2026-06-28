@@ -76,8 +76,7 @@ def generate(
   allocation = allocate(budget, cells)
   messages = [*messages, *_coverage_messages(allocation, strict=strict_coverage)]
 
-  images_dir = out_dir / IMAGES_DIRNAME
-  images_dir.mkdir(parents=True, exist_ok=True)
+  images_dir = _prepare_out_dir(out_dir)
   backends = {name: get_backend(name) for name in active}
 
   records: list[ManifestRecord] = []
@@ -133,6 +132,25 @@ def resolve_libraries(requested: list[str] | None) -> tuple[list[str], list[str]
     return active, []
   message = f"plotly disabled: kaleido static export unavailable; rendering with {', '.join(MANDATORY_LIBRARIES)}"
   return active, [message]
+
+
+def _prepare_out_dir(out_dir: Path) -> Path:
+  """Create the output directory and its ``images/`` subdir, returning the images path.
+
+  Creates at most these two levels: the parent of ``out_dir`` must already exist, so a typo'd path fails loudly instead
+  of silently fabricating a deep directory tree.
+
+  :param out_dir: The dataset directory to create.
+  :return: The ``images/`` directory inside ``out_dir``.
+  :raises DatagenError: If ``out_dir``'s parent directory does not exist.
+  """
+  if not out_dir.parent.is_dir():
+    msg = f"output parent directory does not exist: {out_dir.parent}"
+    raise DatagenError(msg)
+  out_dir.mkdir(exist_ok=True)
+  images_dir = out_dir / IMAGES_DIRNAME
+  images_dir.mkdir(exist_ok=True)
+  return images_dir
 
 
 def _coverage_messages(allocation: Allocation, *, strict: bool) -> list[str]:

@@ -37,6 +37,11 @@ def test_generate_is_deterministic_for_a_fixed_seed_and_library(tmp_path: Path) 
   assert read_manifest(first.out_dir / gen.MANIFEST_NAME) == read_manifest(second.out_dir / gen.MANIFEST_NAME)
 
 
+def test_generate_errors_when_the_output_parent_is_missing(tmp_path: Path) -> None:
+  with pytest.raises(DatagenError, match="parent directory does not exist"):
+    generate(tmp_path / "missing" / "set", libraries=["matplotlib"])
+
+
 def test_generate_strict_coverage_errors_when_under_budget(tmp_path: Path) -> None:
   with pytest.raises(DatagenError, match="under-budget"):
     generate(tmp_path / "set", samples=3, libraries=["matplotlib"], strict_coverage=True)
