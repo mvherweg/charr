@@ -43,8 +43,13 @@ than runtime checks.**
   serve it -> sample a domain for vocabulary, units, and value ranges -> apply label-neutral style jitter -> emit
   `(scene, labels)`. This replaces the `(rule, polarity)` dispatch.
 - **Label-bearing knobs are recipe-controlled; label-neutral knobs randomize freely (seeded).** This split is the
-  invariant that keeps ground truth exact while variety scales: the random draws never touch a verdict, so a chart's
-  labels are a function of its `(cell, type)` alone, independent of the seed.
+  invariant that keeps ground truth exact while variety scales. A chart's labels are a function of its `(cell, type)`
+  alone: the chart type is the one randomized knob that *is* label-bearing (it sets the NA pattern), but that is safe
+  because the label vector is **derived** for whichever type is chosen, never assumed - so two charts in the same cell
+  drawn with different types carry different, individually correct vectors (the intended multi-label variety), and for
+  a *fixed* `(cell, type)` the labels do not depend on the seed. Single-vs-multi group (which sets the legend verdict)
+  is the other label-bearing choice and is fixed deterministically, not drawn. Every other randomized knob - domain,
+  numbers, series count, colours within the palette, cosmetics - is label-neutral.
 - **Chart types are data, not objects.** A chart type is a dataclass: a compliant-baseline builder, a `na_rules` set
   (rules structurally impossible for the type), and a table of type-specific defect injectors. Global defects live in a
   shared default table; a type's effective injectors are the global table merged with its own overrides, minus its
@@ -59,7 +64,7 @@ than runtime checks.**
     the registry metadata** - set operations over `na_rules` and injector keys, with no generation, no seed, and a
     precise failure message. It cannot be perturbed by an unrelated change.
   - **Label correctness** is checked by calling the real recipe and asserting the resulting label vector against the
-    metadata-derived expectation. Because labels are seed-invariant (the split above), any fixed seed suffices; a small
+    metadata-derived expectation. Because labels are seed-invariant for a fixed `(cell, type)` (the split above), any fixed seed suffices; a small
     meta-test asserts the label vector is *identical across several seeds*, proving label-neutrality directly.
   - These checks are **image-blind** - they inspect label bookkeeping and registry structure, never re-derive a verdict
     from pixels - so they are compatible with ADR-0015, which only rejected image-based self-checking.

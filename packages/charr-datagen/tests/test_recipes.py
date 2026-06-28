@@ -11,7 +11,16 @@ import random
 import pytest
 from charr.models import Verdict
 from charr_datagen.cells import Cell, build_cells
-from charr_datagen.recipes import ALL_RULES, GLOBAL_DEFECTS, REGISTRY, ChartType, assemble, capable_types
+from charr_datagen.recipes import (
+  ALL_RULES,
+  GLOBAL_DEFECTS,
+  REGISTRY,
+  ChartType,
+  assemble,
+  canonical_fonts,
+  canonical_palette,
+  capable_types,
+)
 
 _CELLS = build_cells()
 _PAIRS: list[tuple[Cell, ChartType]] = [(cell, chart_type) for cell in _CELLS for chart_type in capable_types(cell)]
@@ -57,3 +66,13 @@ def test_registry_is_non_empty_and_named_uniquely() -> None:
   names = [chart_type.name for chart_type in REGISTRY]
   assert names
   assert len(set(names)) == len(names)
+
+
+def test_canonical_palette_and_fonts_are_nonempty_ascii() -> None:
+  # These strings are written into the dataset's charr.toml and shown to the model, so they must be present and ASCII.
+  palette = canonical_palette()
+  fonts = canonical_fonts()
+  assert palette
+  assert all(name.isascii() for name in palette)
+  assert fonts
+  assert all(font.isascii() for font in fonts)

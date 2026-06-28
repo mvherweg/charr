@@ -5,7 +5,11 @@ rules that are structurally ``not_applicable`` for it (``na_rules``), whether it
 the legend NA), and a table of type-specific defect overrides (empty for the current four types - every defect for the
 eight built-in rules turns out to operate on shared scene fields, so the shared :data:`GLOBAL_DEFECTS` table covers
 them all). Labels stay correct by construction: a chart's verdict vector is a function of its ``(cell, type)`` and the
-single defect injected, never of the seed, because all randomized knobs are label-neutral.
+single defect injected. The chart type is chosen at random per case and *is* label-bearing (it sets the NA pattern), but
+that is safe because :func:`assemble` derives the labels for whichever type is picked; so two charts in the same cell
+with different types carry different, individually correct vectors, and for a fixed ``(cell, type)`` the labels do not
+depend on the seed. Single-vs-multi group is fixed deterministically (it sets the legend verdict); everything else the
+seed drives - domain, numbers, series count, cosmetics - is label-neutral.
 
 To add a chart type, append a :class:`ChartType` with its baseline, ``na_rules``, and (rarely) a type-specific defect.
 To add subject variety, append a :class:`~charr_datagen.domains.Domain`. The generic tests in ``tests/`` then validate

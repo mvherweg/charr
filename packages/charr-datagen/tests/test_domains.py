@@ -14,7 +14,15 @@ def test_domain_carries_enough_ascii_vocabulary(domain: Domain) -> None:
   assert len(domain.series_names) >= _MIN_SERIES  # a multi-group chart picks two to three series
   low, high = domain.value_range
   assert low < high
-  text = (domain.name, domain.category_axis_label, domain.quantity, domain.unit, *domain.titles, *domain.categories)
+  text = (
+    domain.name,
+    domain.category_axis_label,
+    domain.quantity,
+    domain.unit,
+    *domain.titles,
+    *domain.categories,
+    *domain.series_names,  # rendered as legend labels, so they must be ASCII too
+  )
   assert all(piece.isascii() for piece in text)
 
 
