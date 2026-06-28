@@ -96,6 +96,25 @@ generating data or scoring runs. `charr-datagen` and `charr-eval` both depend on
 and verdict vocabulary) but never on each other, so the evaluator can score any dataset in the manifest format,
 generated or hand-curated.
 
+## Extending the generator (charr-datagen)
+
+The generator is a registry of data (see [docs/adr/0018](docs/adr/0018-generator-structure-recipe-registry.md) for the
+why; fuller docs are tracked in issue #9). The one rule that keeps ground-truth labels correct: a knob is either
+**label-bearing** (it changes a verdict - title/axis/units/legend presence, palette, font, baseline) and is set by the
+recipe, or **label-neutral** (subject vocabulary, numbers, colours within the palette, grid, marker, series count) and
+is randomized freely from the seeded RNG. Never randomize a label-bearing knob.
+
+- **Add subject variety:** append a `Domain` literal to `DOMAINS` in `domains.py`. Domains are pure label-neutral
+  vocabulary, so the weirder the better (see `improbable`, `mundane-absurd`).
+- **Add a chart type:** append a `ChartType` to `REGISTRY` in `recipes.py` with a compliant-`baseline` builder, its
+  `na_rules` (rules structurally impossible for it), `supports_single_group`, and - rarely - any type-specific
+  `extra_defects` (the eight built-in rules are all covered by the shared `GLOBAL_DEFECTS`, so this is usually empty).
+
+The generic tests in `tests/test_recipes.py` then validate the addition automatically: `capable_types` proves every
+`(rule, polarity)` cell stays servable (pure metadata, no seed), and the label tests prove each `(cell, type)` is
+correct and seed-invariant. If you add a rule and no chart type can serve one of its cells, the coverage test fails with
+a precise message - run `uv run pytest packages/charr-datagen` after any change here.
+
 ## Decisions (ADRs)
 
 Non-obvious design choices are recorded as Architecture Decision Records under [docs/adr/](docs/adr/README.md): one
