@@ -45,7 +45,9 @@ def _check_one(
     return {}, f"image not found: {image}"
   try:
     report = run_check([image], config, client)
-  except CharrError as exc:
+  except (CharrError, OSError) as exc:
+    # CharrError covers every operational checker/backend failure; OSError covers an unreadable image file (the bytes
+    # are read outside the checker's error model). Both degrade this one image to the error bucket, never aborting.
     return {}, str(exc)
   verdicts = {verdict.rule_id: (verdict.verdict, verdict.rationale) for verdict in report.images[0].verdicts}
   return verdicts, None

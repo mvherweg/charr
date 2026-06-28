@@ -120,7 +120,7 @@ def resolve_libraries(requested: list[str] | None) -> tuple[list[str], list[str]
   if requested:
     unknown = [name for name in requested if name not in ALL_LIBRARIES]
     if unknown:
-      msg = f"unknown rendering library/-ies {unknown}; known: {', '.join(ALL_LIBRARIES)}"
+      msg = f"unknown rendering libraries {unknown}; known: {', '.join(ALL_LIBRARIES)}"
       raise DatagenError(msg)
     active = list(dict.fromkeys(requested))
     if "plotly" in active and not plotly_usable():

@@ -50,7 +50,7 @@ def test_generate_warns_and_proceeds_when_under_budget(tmp_path: Path) -> None:
 
 
 def test_resolve_libraries_rejects_an_unknown_library() -> None:
-  with pytest.raises(DatagenError, match="unknown rendering library"):
+  with pytest.raises(DatagenError, match="unknown rendering libraries"):
     resolve_libraries(["matplotlib", "ggplot"])
 
 

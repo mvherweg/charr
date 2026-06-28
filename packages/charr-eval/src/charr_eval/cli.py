@@ -71,11 +71,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     with requests.Session() as session:
       client = OpenAiCompatClient(settings, session=session)
       records = _evaluate_all(args.manifests, client=client, config_path=args.config)
+    _persist_substrate(args.substrate_out, records)
   except (CharrError, ValueError, OSError) as exc:
     sys.stderr.write(f"charr-eval: {exc}\n")
     return EXIT_CANNOT_RUN
-  _persist_substrate(args.substrate_out, records)
-  sys.stdout.write(format_report(build_scoreboard(records)))
+  sys.stdout.write(format_report(build_scoreboard(records)) + "\n")
   sys.stdout.write(f"\nWrote {len(records)} substrate record(s) to {args.substrate_out}\n")
   return EXIT_OK
 
@@ -84,10 +84,10 @@ def format_report(board: Scoreboard) -> str:
   """Render a scoreboard as an ASCII report: an overall section then one per manifest.
 
   :param board: The scored result.
-  :return: The full report text (no trailing newline beyond the last line).
+  :return: The full report text, sections separated by a blank line, with no trailing newline.
   """
   sections = [board.overall, *board.per_manifest]
-  return "\n".join(_format_section(section) for section in sections)
+  return "\n\n".join(_format_section(section) for section in sections)
 
 
 def _evaluate_all(
@@ -124,8 +124,9 @@ def _format_section(section: Section) -> str:
   columns = f"{'rule':<30} {'n':>4} {'fail':>5} {'err':>4} {'prec':>6} {'recall':>7} {'acc':>6}"
   rows = [_format_rule(score) for score in section.rule_scores]
   macro = _format_macro(section.macro)
-  body = "\n".join([header, columns, *rows, macro]) if rows else f"{header}\n  (no records)"
-  return body + "\n"
+  if not rows:
+    return f"{header}\n  (no records)"
+  return "\n".join([header, columns, *rows, macro])
 
 
 def _format_rule(score: RuleScore) -> str:
