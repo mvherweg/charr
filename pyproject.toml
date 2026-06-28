@@ -36,9 +36,11 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Tests are the one sanctioned relaxation: bare asserts are how pytest works,
-# test functions/modules do not need public-API docstrings, and test dirs are
-# intentionally not importable packages.
-"**/tests/**" = ["S101", "D100", "D101", "D102", "D103", "D104", "INP001"]
+# test functions/modules do not need public-API docstrings, test dirs are
+# intentionally not importable packages, asserting on literal expected values
+# (counts, probabilities) is the substance of a test, and seeded `random` is the
+# point in the generator tests (never security-sensitive here).
+"**/tests/**" = ["S101", "D100", "D101", "D102", "D103", "D104", "INP001", "PLR2004", "S311"]
 
 [tool.ruff.format]
 indent-style = "space"

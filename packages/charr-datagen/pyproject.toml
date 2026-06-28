@@ -1,13 +1,25 @@
 [project]
 name = "charr-datagen"
 version = "0.1.0"
-description = "Charr data generator: synthetic charts with ground-truth labels for benchmarking the checker."
+description = "Charr data generator: synthetic charts with ground-truth labels for evaluating the checker."
 requires-python = ">=3.13"
 license = "MIT"
 authors = [{ name = "Michiel Van Herwegen", email = "michiel@vanherwegen.com" }]
-# Kept separate from the checker on purpose. Plotting backend and other
-# dependencies are TBD; add them when first used, keeping the set minimal.
-dependencies = []
+# Depends on charr for the shared rule catalog and verdict vocabulary (labels use the same rule ids the checker
+# reports). matplotlib + seaborn are the always-on rendering backends; plotly is opt-in via the [plotly] extra because
+# its static export (kaleido) bundles a headless Chromium build we do not force on every install (docs/adr/0013).
+dependencies = [
+  "charr",
+  "pydantic>=2",
+  "matplotlib>=3.8",
+  "seaborn>=0.13",
+]
+
+[project.optional-dependencies]
+plotly = [
+  "plotly>=5",
+  "kaleido>=0.2",
+]
 
 [project.scripts]
 charr-datagen = "charr_datagen.cli:main"
@@ -18,3 +30,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/charr_datagen"]
+
+[tool.uv.sources]
+charr = { workspace = true }

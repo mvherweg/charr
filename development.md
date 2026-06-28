@@ -77,9 +77,13 @@ Charr/
       pyproject.toml
       src/charr/
       tests/
-    charr-datagen/          # the data generator - standalone, benchmarking
+    charr-datagen/          # the data generator - synthetic labeled charts (depends on charr)
       pyproject.toml
       src/charr_datagen/
+      tests/
+    charr-eval/             # the evaluator - scores the checker against a labeled dataset (depends on charr)
+      pyproject.toml
+      src/charr_eval/
       tests/
   project.md
   development.md
@@ -87,8 +91,10 @@ Charr/
   dev-recs/                 # source recordings + transcripts (not shipped)
 ```
 
-The two packages are kept apart on purpose: a user of the checker is not necessarily interested in generating benchmark
-data, and vice versa.
+The packages are kept apart on purpose (docs/adr/0010): a user of the checker is not necessarily interested in
+generating data or scoring runs. `charr-datagen` and `charr-eval` both depend on `charr` (for the shared rule catalog
+and verdict vocabulary) but never on each other, so the evaluator can score any dataset in the manifest format,
+generated or hand-curated.
 
 ## Decisions (ADRs)
 
@@ -108,8 +114,6 @@ uv sync
 
 ## Running the tools
 
-The chart checker is implemented; the data generator is not yet.
-
 ```
 # run the chart checker over a folder of images (non-recursive), JSON on stdout
 uv run charr check ./charts
@@ -117,8 +121,11 @@ uv run charr check ./charts
 # point at single files or a simple glob too (no ** recursion yet)
 uv run charr check report.png "charts/*.png"
 
-# data generator: not implemented yet
-uv run charr-datagen ...
+# generate a labeled dataset (images + JSONL manifest + checker config + run metadata)
+uv run charr-datagen generate --out ./set --seed 0
+
+# score the checker against one or more manifests (needs CHARR_LLM_* set; manual/dev use)
+uv run charr-eval ./set/labels.jsonl
 ```
 
 The checker prints **JSON only** and exits **non-zero when any enabled, non-excepted rule fails** (1 = a rule failed,
@@ -189,7 +196,7 @@ uv run pytest packages/charr  # one package
 
 - Use **long, clearly descriptive test names** that read as a sentence about the behavior under test.
 - Keep tests deterministic. Where a test would otherwise hit a real LLM endpoint, stub/mock the backend so the suite
-  runs offline and fast; reserve real-model runs for the data-generator-driven benchmarks.
+  runs offline and fast; reserve real-model runs for `charr-eval` against a generated dataset.
 
 ## Checks and CI
 
