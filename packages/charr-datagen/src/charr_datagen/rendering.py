@@ -66,7 +66,7 @@ def plotly_usable() -> bool:
   :return: True when plotly + a static-export path are available.
   """
   try:
-    import plotly.graph_objects as go  # noqa: PLC0415 - optional dependency probed lazily on purpose
+    import plotly.graph_objects as go  # noqa: PLC0415  # pyright: ignore[reportMissingImports] - optional extra
   except ImportError:
     return False
   try:
@@ -142,7 +142,7 @@ def _mpl_axes(ax: Axes, scene: ChartScene) -> None:
 
 def _draw_plotly(scene: ChartScene, out: Path) -> None:
   """Render ``scene`` with plotly + kaleido; only called when :func:`plotly_usable` returned True."""
-  import plotly.graph_objects as go  # noqa: PLC0415 - optional dependency, imported only when plotly is active
+  import plotly.graph_objects as go  # noqa: PLC0415  # pyright: ignore[reportMissingImports] - optional extra
 
   if scene.chart_type is ChartType.PIE:
     series = scene.series[0]
