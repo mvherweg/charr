@@ -3,7 +3,9 @@
 Charr: a CLI checker that lints chart images against a rule set using (local) LLMs. Context: see
 [project.md](project.md) (what and why) and [development.md](development.md) (setup, layout, workflow). For why things
 are the way they are (decisions with alternatives and consequences), see the Architecture Decision Records in
-[docs/adr/](docs/adr/README.md); record a new ADR when you make a non-obvious design choice.
+[docs/adr/](docs/adr/README.md); record a new ADR when you make a non-obvious design choice. For a non-trivial piece of
+work, identify the decisions likely to need an ADR up front (list them at the top of the tracking issue) and settle each
+one (trade-off, position, open questions) before implementing; see [docs/adr/README.md](docs/adr/README.md).
 
 ## Environment
 
