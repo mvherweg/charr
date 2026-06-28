@@ -54,4 +54,7 @@ Run these locally when practical; CI runs the full set on every PR:
 ## Working style
 
 - Honesty over pleasing. No flattery. If a better approach exists, say so with reasons.
-- Do not commit or push unless asked. Branch off `main`; never commit directly to `main`.
+- Do not commit or push unless asked. Branch off `main`; never commit directly to `main`, and **never merge a PR to
+  `main` yourself** - open it and leave the merge to a maintainer.
+- Commit style (Conventional Commits for the commit that lands on `main`; encouraged but optional for individual
+  commits) is documented in [development.md](development.md).

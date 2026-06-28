@@ -213,6 +213,16 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) runs, after `uv sync`:
 - `uv run pytest`
 - an ASCII-only check over tracked `*.py` and `*.md` files
 
+## Commits and merges
+
+- Work on a feature branch and open a pull request; **never commit to `main` directly, and never merge a PR yourself** -
+  a maintainer does the merge (agents in particular must not merge themselves).
+- The commit that lands a PR on `main` (merge or squash) uses
+  [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): a `feat:` / `fix:` / `docs:` / ... type, an
+  imperative summary, an optional body, and a `BREAKING CHANGE:` footer when the public API breaks.
+- Individual commits along the way are **encouraged** to follow the same style but are **not required** - keep them
+  lightweight and flexible while you work. The landing commit is the one that has to read well.
+
 ## Dependencies
 
 - Add deps with uv, scoped to the package that needs them:
