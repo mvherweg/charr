@@ -76,6 +76,16 @@ BUILTIN_RULES: tuple[Rule, ...] = (
 
 BUILTIN_RULES_BY_ID: dict[RuleId, Rule] = {rule.id: rule for rule in BUILTIN_RULES}
 
+# Rules that only mean something when a matching expectation is configured. Each maps to the ``Config`` field whose
+# emptiness makes the rule not applicable: with no palette there is nothing for palette-compliance to judge against, and
+# likewise for fonts. The checker resolves these to a deterministic ``not_applicable`` and drops them from the model
+# request rather than asking the prompt to elicit it (issue #14), so the outcome is guaranteed and offline-testable
+# instead of hinging on the LLM.
+CONFIG_GATED_RULES: dict[RuleId, str] = {
+  "palette-compliance": "palette",
+  "font-compliance": "fonts",
+}
+
 
 def select_enabled_rules(enable: list[RuleId], disable: list[RuleId]) -> list[Rule]:
   """Resolve which built-in rules to run, preserving catalog order.
