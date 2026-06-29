@@ -13,8 +13,6 @@ from pathlib import Path
 from charr.models import CharrError
 
 from charr_datagen.generate import (
-  CONFIG_NAME,
-  MANIFEST_NAME,
   META_NAME,
   GenerationResult,
   generate,
@@ -43,7 +41,14 @@ def build_parser() -> argparse.ArgumentParser:
     type=int,
     default=None,
     metavar="N",
-    help="Total number of cases to generate (default: one per (rule, polarity) cell).",
+    help="Number of cases per config (default: one per (rule, polarity) cell). Total images are samples * configs.",
+  )
+  gen.add_argument(
+    "--configs",
+    type=int,
+    default=1,
+    metavar="N",
+    help="Number of independent style-configs to sample, each written as its own config-NN/ dataset (default: 1).",
   )
   gen.add_argument(
     "--libraries",
@@ -72,6 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     result = generate(
       args.out,
       samples=args.samples,
+      configs=args.configs,
       seed=args.seed,
       libraries=args.libraries,
       strict_coverage=args.strict_coverage,
@@ -88,12 +94,11 @@ def _report(result: GenerationResult) -> None:
   for message in result.messages:
     sys.stderr.write(f"charr-datagen: {message}\n")
   lines = [
-    f"Wrote {result.image_count} image(s) to {result.out_dir}",
+    f"Wrote {result.image_count} image(s) across {len(result.configs)} config(s) to {result.out_dir}",
     f"  libraries: {', '.join(result.libraries)}",
-    f"  manifest:  {result.out_dir / MANIFEST_NAME}",
-    f"  config:    {result.out_dir / CONFIG_NAME}",
-    f"  metadata:  {result.out_dir / META_NAME}",
+    f"  run index: {result.out_dir / META_NAME}",
   ]
+  lines.extend(f"  {item.config.name}: {item.image_count} image(s) -> {item.out_dir}" for item in result.configs)
   if result.uncovered:
-    lines.append(f"  uncovered: {len(result.uncovered)} cell(s) (see metadata)")
+    lines.append(f"  uncovered: {len(result.uncovered)} cell(s) per config (see metadata)")
   sys.stdout.write("\n".join(lines) + "\n")

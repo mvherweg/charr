@@ -21,8 +21,11 @@ from typing import Literal
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from matplotlib import font_manager
 from matplotlib.axes import Axes
 
+from charr_datagen.errors import DatagenError
+from charr_datagen.fonts import SUPPORTED_FONTS, font_path
 from charr_datagen.scenes import ChartKind, ChartScene
 
 _SeabornStyle = Literal["white", "dark", "whitegrid", "darkgrid", "ticks"]
@@ -234,3 +237,31 @@ def _draw_plotly(scene: ChartScene, out: Path) -> None:
         font={"size": 13},
       )
   figure.write_image(out, format="png")
+
+
+def _register_bundled_fonts() -> None:
+  """Register every bundled font with matplotlib and verify none silently falls back to a different family.
+
+  matplotlib renders a registered font faithfully, so a chart drawn in an approved font really shows it - which is why
+  font-compliance ground truth is trusted on matplotlib/seaborn (and held ``not_applicable`` on plotly, docs/adr/0021).
+  A missing file or a fallback to a different family raises rather than mislabelling an image.
+  """
+  for font in SUPPORTED_FONTS:
+    path = font_path(font)
+    if not path.is_file():
+      msg = f"bundled font missing: {path}"
+      raise DatagenError(msg)
+    font_manager.fontManager.addfont(str(path))
+  for font in SUPPORTED_FONTS:
+    try:
+      resolved = font_manager.findfont(font.name, fallback_to_default=False)
+    except ValueError as exc:
+      msg = f"bundled font {font.name!r} did not register with matplotlib"
+      raise DatagenError(msg) from exc
+    family = font_manager.FontProperties(fname=resolved).get_name()
+    if family != font.name:
+      msg = f"font {font.name!r} resolves to {family!r}: registration failed or a silent fallback occurred"
+      raise DatagenError(msg)
+
+
+_register_bundled_fonts()

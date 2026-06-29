@@ -1,15 +1,18 @@
-"""The chart-type recipe registry: compose a cell, a chart type, a domain, and label-neutral jitter into a case.
+"""The chart-type recipe registry: compose a cell, a chart type, a domain, a style-config, and jitter into a case.
 
 This is the heart of the generator (docs/adr/0018). A chart type is **data**: a compliant-baseline builder, the set of
 rules that are structurally ``not_applicable`` for it (``na_rules``), whether it can be drawn single-group (which makes
 the legend NA), and a table of type-specific defect overrides (empty for the current four types - every defect for the
 eight built-in rules turns out to operate on shared scene fields, so the shared :data:`GLOBAL_DEFECTS` table covers
-them all). Labels stay correct by construction: a chart's verdict vector is a function of its ``(cell, type)`` and the
-single defect injected. The chart type is chosen at random per case and *is* label-bearing (it sets the NA pattern), but
-that is safe because :func:`assemble` derives the labels for whichever type is picked; so two charts in the same cell
-with different types carry different, individually correct vectors, and for a fixed ``(cell, type)`` the labels do not
-depend on the seed. Single-vs-multi group is fixed deterministically (it sets the legend verdict); everything else the
-seed drives - domain, numbers, series count, cosmetics - is label-neutral.
+them all).
+
+Labels stay correct by construction. A chart's verdict vector is a function of its ``(cell, type)`` and the single
+defect injected; the style-config (docs/adr/0019) supplies the palette and approved fonts but never changes a verdict,
+because the recipe draws compliant charts *from* the config and draws each violation *outside* it: compliant colours
+come from the config palette and a compliant font from its approved set, while the palette / font violations sample a
+colour beyond :data:`~charr_datagen.colour.T_VIOLATION` of the palette (docs/adr/0020) and a font differing by a
+distinguishing property from every approved font (docs/adr/0021). So the label is exact for any sampled config, and for
+a fixed ``(cell, type, config)`` it does not depend on the seed.
 
 To add a chart type, append a :class:`ChartType` with its baseline, ``na_rules``, and (rarely) a type-specific defect.
 To add subject variety, append a :class:`~charr_datagen.domains.Domain`. The generic tests in ``tests/`` then validate
@@ -24,31 +27,25 @@ from charr.models import RuleId, Verdict
 from charr.rules import BUILTIN_RULES
 
 from charr_datagen.cells import Cell
+from charr_datagen.colour import sample_off_palette
+from charr_datagen.configs import StyleConfig
 from charr_datagen.domains import DOMAINS, Domain
+from charr_datagen.fonts import sample_violation
 from charr_datagen.scenes import ChartKind, ChartScene, Series
 
 ALL_RULES: tuple[RuleId, ...] = tuple(rule.id for rule in BUILTIN_RULES)
 
 _LEGEND = "legend-when-multiple-groups"
 
-# The palette compliant charts draw from, as (human name, hex). Names go into the checker config so the palette rule is
-# judged against meaningful colors; hexes are what the backends draw. Off-palette charts use colors clearly outside it.
-_PALETTE: tuple[tuple[str, str], ...] = (
-  ("blue", "#1f77b4"),
-  ("orange", "#ff7f0e"),
-  ("green", "#2ca02c"),
-  ("red", "#d62728"),
-  ("purple", "#9467bd"),
-)
-_OFF_PALETTE: tuple[str, ...] = ("#ff1493", "#00ff00", "#00ffff", "#ff00ff", "#7fff00")  # hot pink, lime, cyan, ...
-
-_FONT_SANS = "sans-serif"
-_FONT_SERIF = "serif"
-_FONT_EXPECTATION = "sans-serif"
-
 _TIME_LABELS: tuple[str, ...] = ("Month", "Quarter", "Week", "Year", "Period")
 _SAMPLE_LABELS: tuple[str, ...] = ("Sample", "Observation", "Trial", "Specimen", "Measurement")
 _MARKERS: tuple[str, ...] = ("o", "s", "^", "D", "v")
+
+# An injector turns one rule's verdict to FAIL by mutating the scene; it may consult the active style-config (for the
+# palette / approved fonts) and the rng (to sample a concrete violation). Most injectors need neither.
+type Injector = Callable[[ChartScene, StyleConfig, random.Random], None]
+# A baseline builds a fully-compliant scene for a chart type from a domain and the active style-config.
+type Baseline = Callable[..., ChartScene]
 
 
 @dataclass
@@ -65,7 +62,7 @@ class ChartType:
 
   :param name: Stable identifier (used in filenames/metadata).
   :param kind: The visual kind the backends draw.
-  :param baseline: Builds a fully compliant scene of this type from ``(domain, rng, multi=...)``.
+  :param baseline: Builds a fully compliant scene of this type from ``(domain, config, rng, multi=...)``.
   :param na_rules: Rules structurally ``not_applicable`` for this type (e.g. a pie has no axes).
   :param supports_single_group: Whether the type can be drawn with one group, which makes the legend NA.
   :param extra_defects: Type-specific defect injectors, overriding :data:`GLOBAL_DEFECTS` (empty for the built-in four).
@@ -73,39 +70,24 @@ class ChartType:
 
   name: str
   kind: ChartKind
-  baseline: Callable[..., ChartScene]
+  baseline: Baseline
   na_rules: frozenset[RuleId]
   supports_single_group: bool
-  extra_defects: dict[RuleId, Callable[[ChartScene], None]] = field(default_factory=dict)
+  extra_defects: dict[RuleId, Injector] = field(default_factory=dict)
 
-  def defect_for(self, rule_id: RuleId) -> Callable[[ChartScene], None]:
+  def defect_for(self, rule_id: RuleId) -> Injector:
     """Return the injector that makes ``rule_id`` fail for this type (type-specific override, else global)."""
     return self.extra_defects.get(rule_id, GLOBAL_DEFECTS[rule_id])
 
 
-def canonical_palette() -> list[str]:
-  """Return the palette color names to record in the dataset's checker config.
-
-  :return: The human-readable color names the compliant charts use.
-  """
-  return [name for name, _ in _PALETTE]
-
-
-def canonical_fonts() -> list[str]:
-  """Return the font expectation to record in the dataset's checker config.
-
-  :return: A single-element list naming the expected (sans-serif) typeface family.
-  """
-  return [_FONT_EXPECTATION]
-
-
-def build_case(cell: Cell, rng: random.Random) -> Case:
-  """Build the scene and ground-truth labels for one case in ``cell``, randomized within the cell.
+def build_case(cell: Cell, config: StyleConfig, rng: random.Random) -> Case:
+  """Build the scene and ground-truth labels for one case in ``cell``, drawn against ``config``.
 
   The cell fixes the target rule and its verdict; the chart type (among those that can serve the cell), the domain, the
   numbers, and the cosmetic style are drawn from ``rng``. All of those are label-neutral, so the labels are exact.
 
   :param cell: The target ``(rule, polarity)`` to construct a chart for.
+  :param config: The active style-config (palette + approved fonts) the chart is drawn against.
   :param rng: A seeded RNG owned by this case; drives all within-cell randomization.
   :return: The case, with labels known by construction.
   :raises ValueError: If no registered chart type can serve the cell (a registry/catalog drift the tests guard against).
@@ -114,28 +96,30 @@ def build_case(cell: Cell, rng: random.Random) -> Case:
   if not capable:
     msg = f"no chart type can serve cell {cell.label!r}"
     raise ValueError(msg)
-  return assemble(cell, rng.choice(capable), rng)
+  return assemble(cell, rng.choice(capable), config, rng)
 
 
-def assemble(cell: Cell, chart_type: ChartType, rng: random.Random) -> Case:
-  """Build a case for ``cell`` using a specific ``chart_type`` (the type-pinned core of :func:`build_case`).
+def assemble(cell: Cell, chart_type: ChartType, config: StyleConfig, rng: random.Random) -> Case:
+  """Build a case for ``cell`` using a specific ``chart_type`` and ``config`` (the pinned core of :func:`build_case`).
 
-  Exposed so tests can fix the chart type and assert the labels are correct and seed-invariant for that ``(cell, type)``
-  pair. The label vector depends only on ``(cell, type)`` - never on ``rng``, which drives only label-neutral choices
-  (domain, numbers, series count, cosmetics).
+  Exposed so tests can fix the chart type and assert the labels are correct and seed-invariant for that
+  ``(cell, type, config)``. The label vector depends only on ``(cell, type)`` - never on ``rng`` or which concrete
+  colours/fonts the config supplies, which drive only label-neutral choices.
 
   :param cell: The target ``(rule, polarity)``.
   :param chart_type: The chart type to render with; must be able to serve ``cell``.
+  :param config: The active style-config the chart is drawn against.
   :param rng: Seeded RNG for the label-neutral choices.
   :return: The case, with labels known by construction.
   """
   domain = rng.choice(DOMAINS)
   multi = _multi_for(cell)
-  scene = chart_type.baseline(domain, rng, multi=multi)
+  scene = chart_type.baseline(domain, config, rng, multi=multi)
+  scene.font_family = rng.choice(config.fonts).name
   _jitter(scene, rng)
   labels = _baseline_labels(chart_type, multi=multi)
   if cell.polarity is Verdict.FAIL:
-    chart_type.defect_for(cell.rule_id)(scene)
+    chart_type.defect_for(cell.rule_id)(scene, config, rng)
     labels.update(_FAIL_COLLATERAL.get(cell.rule_id, {}))
   labels[cell.rule_id] = cell.polarity
   return Case(scene=scene, labels=labels)
@@ -193,66 +177,68 @@ _FAIL_COLLATERAL: dict[RuleId, dict[RuleId, Verdict]] = {
 # --- defect injectors (global; each introduces exactly one violation on shared scene fields) ---
 
 
-def _drop_title(scene: ChartScene) -> None:
+def _drop_title(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
   scene.title = None
 
 
-def _drop_axis_labels(scene: ChartScene) -> None:
+def _drop_axis_labels(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
   scene.x_label = None
   scene.y_label = None
 
 
-def _induce_overlap(scene: ChartScene) -> None:
+def _induce_overlap(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
   scene.overlap = True
 
 
-def _off_palette(scene: ChartScene) -> None:
-  for index, series in enumerate(scene.series):
-    series.color = _OFF_PALETTE[index % len(_OFF_PALETTE)]
+def _off_palette(scene: ChartScene, config: StyleConfig, rng: random.Random) -> None:
+  # Recolour every drawn element with a colour clearly outside the config palette, so palette-compliance is a true fail
+  # by construction (each is >= T_VIOLATION from every palette colour, docs/adr/0020).
+  for series in scene.series:
+    series.color = sample_off_palette(rng, config.palette)
   if scene.palette:
-    scene.palette = [_OFF_PALETTE[index % len(_OFF_PALETTE)] for index in range(len(scene.palette))]
+    scene.palette = [sample_off_palette(rng, config.palette) for _ in scene.palette]
 
 
-def _use_serif(scene: ChartScene) -> None:
-  scene.font_family = _FONT_SERIF
+def _unapproved_font(scene: ChartScene, config: StyleConfig, rng: random.Random) -> None:
+  # A font differing by a distinguishing property from every approved font, so font-compliance is a true fail.
+  scene.font_family = sample_violation(rng, config.fonts).name
 
 
-def _drop_units(scene: ChartScene) -> None:
+def _drop_units(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
   if scene.y_label and " (" in scene.y_label:
     scene.y_label = scene.y_label.split(" (")[0]
 
 
-def _remove_legend(scene: ChartScene) -> None:
+def _remove_legend(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
   scene.show_legend = False
 
 
-def _nonzero_baseline(scene: ChartScene) -> None:
+def _nonzero_baseline(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
   scene.y_baseline_zero = False
 
 
-GLOBAL_DEFECTS: dict[RuleId, Callable[[ChartScene], None]] = {
+GLOBAL_DEFECTS: dict[RuleId, Injector] = {
   "has-title": _drop_title,
   "axes-labeled": _drop_axis_labels,
   "no-overlapping-elements": _induce_overlap,
   "palette-compliance": _off_palette,
-  "font-compliance": _use_serif,
+  "font-compliance": _unapproved_font,
   "axis-units": _drop_units,
   _LEGEND: _remove_legend,
   "zero-baseline": _nonzero_baseline,
 }
 
 
-# --- compliant baselines (one per kind; each returns a fully-passing scene of that kind) ---
+# --- compliant baselines (one per kind; each returns a fully-passing scene of that kind, coloured from the config) ---
 
 
-def _bar_baseline(domain: Domain, rng: random.Random, *, multi: bool) -> ChartScene:
+def _bar_baseline(domain: Domain, config: StyleConfig, rng: random.Random, *, multi: bool) -> ChartScene:
+  names = _series_names(domain, rng, multi=multi, palette_size=config.palette_size)
   count = rng.randint(3, min(5, len(domain.categories)))
   categories = list(rng.sample(domain.categories, count))
-  names = _series_names(domain, rng, multi=multi)
-  colors = _pick_colors(rng, len(names))
   series = [
     Series(name=name, x=list(categories), y=_values(domain, rng, count), color=color)
-    for name, color in zip(names, colors, strict=True)
+    for name, color in zip(names, _colours(config, rng, len(names)), strict=True)
   ]
   return ChartScene(
     kind=ChartKind.BAR,
@@ -264,14 +250,13 @@ def _bar_baseline(domain: Domain, rng: random.Random, *, multi: bool) -> ChartSc
   )
 
 
-def _line_baseline(domain: Domain, rng: random.Random, *, multi: bool) -> ChartScene:
+def _line_baseline(domain: Domain, config: StyleConfig, rng: random.Random, *, multi: bool) -> ChartScene:
+  names = _series_names(domain, rng, multi=multi, palette_size=config.palette_size)
   count = rng.randint(5, 8)
   xs = [float(step) for step in range(1, count + 1)]
-  names = _series_names(domain, rng, multi=multi)
-  colors = _pick_colors(rng, len(names))
   series = [
     Series(name=name, x=list(xs), y=_values(domain, rng, count), color=color)
-    for name, color in zip(names, colors, strict=True)
+    for name, color in zip(names, _colours(config, rng, len(names)), strict=True)
   ]
   return ChartScene(
     kind=ChartKind.LINE,
@@ -283,10 +268,9 @@ def _line_baseline(domain: Domain, rng: random.Random, *, multi: bool) -> ChartS
   )
 
 
-def _scatter_baseline(domain: Domain, rng: random.Random, *, multi: bool) -> ChartScene:
+def _scatter_baseline(domain: Domain, config: StyleConfig, rng: random.Random, *, multi: bool) -> ChartScene:
+  names = _series_names(domain, rng, multi=multi, palette_size=config.palette_size)
   count = rng.randint(8, 15)
-  names = _series_names(domain, rng, multi=multi)
-  colors = _pick_colors(rng, len(names))
   series = [
     Series(
       name=name,
@@ -294,7 +278,7 @@ def _scatter_baseline(domain: Domain, rng: random.Random, *, multi: bool) -> Cha
       y=_values(domain, rng, count),
       color=color,
     )
-    for name, color in zip(names, colors, strict=True)
+    for name, color in zip(names, _colours(config, rng, len(names)), strict=True)
   ]
   return ChartScene(
     kind=ChartKind.SCATTER,
@@ -306,11 +290,12 @@ def _scatter_baseline(domain: Domain, rng: random.Random, *, multi: bool) -> Cha
   )
 
 
-def _pie_baseline(domain: Domain, rng: random.Random, *, multi: bool) -> ChartScene:
+def _pie_baseline(domain: Domain, config: StyleConfig, rng: random.Random, *, multi: bool) -> ChartScene:
   _ = multi  # a pie is always multi-slice; the single-group case never reaches here
-  count = rng.randint(3, min(5, len(domain.categories)))
+  # Bound slice count by the palette size so every slice gets a distinct palette colour.
+  count = rng.randint(3, min(5, len(domain.categories), config.palette_size))
   categories = list(rng.sample(domain.categories, count))
-  colors = _pick_colors(rng, count)
+  colors = _colours(config, rng, count)
   return ChartScene(
     kind=ChartKind.PIE,
     title=rng.choice(domain.titles),
@@ -352,18 +337,18 @@ def _y_label(domain: Domain) -> str:
   return f"{domain.quantity} ({domain.unit})"
 
 
-def _series_names(domain: Domain, rng: random.Random, *, multi: bool) -> list[str]:
-  # A multi-group chart picks 2-3 series (label-neutral: the legend stays a pass either way); single picks one.
+def _series_names(domain: Domain, rng: random.Random, *, multi: bool, palette_size: int) -> list[str]:
+  # A multi-group chart picks 2-3 series (label-neutral: the legend stays a pass either way), capped by the palette size
+  # so each series gets a distinct palette colour; a single-group chart picks one.
   if not multi:
     return [rng.choice(domain.series_names)]
-  count = rng.randint(2, min(3, len(domain.series_names)))
+  count = rng.randint(2, min(3, len(domain.series_names), palette_size))
   return list(rng.sample(domain.series_names, count))
 
 
-def _pick_colors(rng: random.Random, count: int) -> list[str]:
-  hexes = [hex_value for _, hex_value in _PALETTE]
-  start = rng.randrange(len(hexes))
-  return [hexes[(start + offset) % len(hexes)] for offset in range(count)]
+def _colours(config: StyleConfig, rng: random.Random, count: int) -> list[str]:
+  # Distinct compliant colours drawn from the config palette (count is bounded by the palette size by the callers).
+  return rng.sample(config.palette, count)
 
 
 def _values(domain: Domain, rng: random.Random, count: int) -> list[float]:
