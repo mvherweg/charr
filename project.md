@@ -99,6 +99,8 @@ day one.
 - **Legend when multiple groups:** a legend is present when more than one group/series is shown.
 - **Zero-baseline when omitting it misleads:** the y-axis starts at 0 for plot types where not doing so is misleading
   (e.g. bar charts).
+- **Background-series contrast:** the plot background contrasts clearly with every plotted data series, so no series
+  blends into the canvas.
 
 **Exceptions / opt-outs:** the global config is expected to make nearly everything pass as configured. For the few cases
 that should be exempt, Charr provides an **exception mechanism**: per-rule / per-chart opt-outs. (Comparable to ignoring

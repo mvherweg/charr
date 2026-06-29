@@ -72,6 +72,15 @@ BUILTIN_RULES: tuple[Rule, ...] = (
       "when a misleading non-zero baseline is used."
     ),
   ),
+  Rule(
+    id="background-series-contrast",
+    summary="Background contrasts with the series colors.",
+    prompt=(
+      "The plot background must contrast clearly with every plotted data series, so no series blends into it. Fail "
+      "when a series color is so close to the background color that the series is hard to make out against it. Judge "
+      "the data marks (bars, lines, points) against the background, not the axes or gridlines."
+    ),
+  ),
 )
 
 BUILTIN_RULES_BY_ID: dict[RuleId, Rule] = {rule.id: rule for rule in BUILTIN_RULES}

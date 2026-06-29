@@ -12,7 +12,7 @@ import random
 import pytest
 from charr.models import Verdict
 from charr_datagen.cells import Cell, build_cells
-from charr_datagen.colour import T_VIOLATION, delta_e2000, srgb_hex_to_lab
+from charr_datagen.colour import T_VIOLATION, T_WITHIN, delta_e2000, srgb_hex_to_lab
 from charr_datagen.configs import sample_config
 from charr_datagen.fonts import SUPPORTED_FONTS, are_distinct
 from charr_datagen.recipes import (
@@ -111,6 +111,35 @@ def test_no_overlapping_rule_is_a_symmetric_data_label_contrast() -> None:
     assert pass_scene.data_labels is DataLabels.SEPARATED
   other = Cell("has-title", Verdict.PASS)
   assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.data_labels is DataLabels.NONE
+
+
+def test_background_contrast_fail_blends_a_series_while_pass_keeps_the_background_distinct() -> None:
+  # FAIL paints the canvas the exact colour of a plotted series (it blends in); PASS paints it a colour clearly
+  # separated from every series. Both sides therefore carry a (possibly tinted) background, so a tinted canvas is not
+  # the cue - only whether it matches a series is. Pie is NA for this rule, so it never serves these cells.
+  fail = Cell("background-series-contrast", Verdict.FAIL)
+  passing = Cell("background-series-contrast", Verdict.PASS)
+  for name in ("bar", "line", "scatter"):
+    for seed in range(10):
+      fail_scene = assemble(fail, _type_named(fail, name), _CONFIG, random.Random(seed)).scene
+      assert fail_scene.background in {series.color for series in fail_scene.series}
+      pass_scene = assemble(passing, _type_named(passing, name), _CONFIG, random.Random(seed)).scene
+      background_lab = srgb_hex_to_lab(pass_scene.background)
+      assert all(delta_e2000(background_lab, srgb_hex_to_lab(series.color)) >= T_WITHIN for series in pass_scene.series)
+
+
+def test_background_contrast_fail_keeps_every_series_colour_on_the_palette() -> None:
+  # The fail recolours nothing - it only matches the canvas to an existing series - so it never doubles as a
+  # palette-compliance fail (single-intended-issue, docs/adr/0016).
+  cell = Cell("background-series-contrast", Verdict.FAIL)
+  for seed in range(10):
+    scene = assemble(cell, _type_named(cell, "bar"), _CONFIG, random.Random(seed)).scene
+    assert all(series.color in _CONFIG.palette for series in scene.series)
+
+
+def test_non_background_cells_keep_the_white_canvas() -> None:
+  other = Cell("has-title", Verdict.PASS)
+  assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.background == "#ffffff"
 
 
 def test_global_defects_cover_every_rule() -> None:

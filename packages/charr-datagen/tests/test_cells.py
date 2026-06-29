@@ -14,8 +14,10 @@ def test_build_cells_covers_every_rule_with_fail_and_pass() -> None:
     assert Verdict.PASS in polarities
 
 
-def test_build_cells_yields_twenty_cells() -> None:
-  assert len(build_cells()) == 20
+def test_build_cells_yields_one_cell_per_rule_polarity() -> None:
+  # Eight rules carry fail+pass, four of those add a not_applicable cell, and background-series-contrast adds fail+pass:
+  # 9 rules with fail+pass (18) + 4 NA cells = 22. Bump this when a rule or polarity is added (a deliberate tripwire).
+  assert len(build_cells()) == 22
 
 
 def test_priority_order_puts_all_fail_and_pass_before_any_not_applicable() -> None:

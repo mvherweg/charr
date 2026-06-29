@@ -3,8 +3,7 @@
 This is the heart of the generator (docs/adr/0018). A chart type is **data**: a compliant-baseline builder, the set of
 rules that are structurally ``not_applicable`` for it (``na_rules``), whether it can be drawn single-group (which makes
 the legend NA), and a table of type-specific defect overrides (empty for the current four types - every defect for the
-eight built-in rules turns out to operate on shared scene fields, so the shared :data:`GLOBAL_DEFECTS` table covers
-them all).
+built-in rules turns out to operate on shared scene fields, so the shared :data:`GLOBAL_DEFECTS` table covers them all).
 
 Labels stay correct by construction. A chart's verdict vector is a function of its ``(cell, type)`` and the single
 defect injected; the style-config (docs/adr/0019) supplies the palette and approved fonts but never changes a verdict,
@@ -27,7 +26,7 @@ from charr.models import RuleId, Verdict
 from charr.rules import BUILTIN_RULES
 
 from charr_datagen.cells import Cell
-from charr_datagen.colour import sample_off_palette
+from charr_datagen.colour import delta_e2000, sample_off_palette, srgb_hex_to_lab
 from charr_datagen.configs import StyleConfig
 from charr_datagen.domains import DOMAINS, Domain
 from charr_datagen.fonts import sample_violation
@@ -37,6 +36,7 @@ ALL_RULES: tuple[RuleId, ...] = tuple(rule.id for rule in BUILTIN_RULES)
 
 _LEGEND = "legend-when-multiple-groups"
 _OVERLAP = "no-overlapping-elements"
+_BACKGROUND = "background-series-contrast"
 
 _TIME_LABELS: tuple[str, ...] = ("Month", "Quarter", "Week", "Year", "Period")
 _SAMPLE_LABELS: tuple[str, ...] = ("Sample", "Observation", "Trial", "Specimen", "Measurement")
@@ -223,6 +223,15 @@ def _nonzero_baseline(scene: ChartScene, _config: StyleConfig, _rng: random.Rand
   scene.y_baseline_zero = False
 
 
+def _low_background_contrast(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
+  # Paint the canvas the exact colour of one plotted series, so that series blends into the background (deltaE2000 = 0,
+  # a guaranteed low-contrast fail). The colour is one the chart already draws, so it stays in-palette and this never
+  # doubles as a palette-compliance fail; the other series stay distinct (palette colours are >= T_WITHIN apart). The
+  # compliant exemplar (_distinct_background) paints a colour far from every series, so a tinted canvas is not the cue -
+  # only whether it matches a series is.
+  scene.background = rng.choice(scene.series).color
+
+
 # --- compliant exemplars: positive features a rule's PASS side must *show* so its FAIL is a layout contrast, not a
 # presence cue. Only no-overlapping needs one: its FAIL crowds the value labels (above), so its PASS must draw the same
 # labels cleanly separated. Every other rule's baseline is already a clean pass, so the table holds just this entry.
@@ -232,7 +241,24 @@ def _separate_labels(scene: ChartScene, _config: StyleConfig, _rng: random.Rando
   scene.data_labels = DataLabels.SEPARATED
 
 
-COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels}
+def _distinct_background(scene: ChartScene, config: StyleConfig, _rng: random.Random) -> None:
+  # Show a deliberately high-contrast non-white background so the FAIL is "background matches a series", not merely
+  # "background is tinted". Among the palette colours the chart does not plot, take the one *farthest* from every series
+  # (the clearest available contrast): being in-palette it cannot read as a palette violation, and choosing the max-min
+  # distance avoids a near-boundary near-miss. If the chart uses the whole palette, fall back to the white norm (still
+  # high-contrast against the legible-band series).
+  series_labs = [srgb_hex_to_lab(series.color) for series in scene.series]
+  drawn = {series.color for series in scene.series}
+  unused = [colour for colour in config.palette if colour not in drawn]
+  if unused:
+    scene.background = max(unused, key=lambda colour: _min_distance(srgb_hex_to_lab(colour), series_labs))
+
+
+def _min_distance(lab: tuple[float, float, float], others: list[tuple[float, float, float]]) -> float:
+  return min(delta_e2000(lab, other) for other in others)
+
+
+COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels, _BACKGROUND: _distinct_background}
 
 
 GLOBAL_DEFECTS: dict[RuleId, Injector] = {
@@ -244,6 +270,7 @@ GLOBAL_DEFECTS: dict[RuleId, Injector] = {
   "axis-units": _drop_units,
   _LEGEND: _remove_legend,
   "zero-baseline": _nonzero_baseline,
+  _BACKGROUND: _low_background_contrast,
 }
 
 
@@ -345,7 +372,7 @@ REGISTRY: tuple[ChartType, ...] = (
     name="pie",
     kind=ChartKind.PIE,
     baseline=_pie_baseline,
-    na_rules=frozenset({"axes-labeled", "axis-units", "zero-baseline"}),
+    na_rules=frozenset({"axes-labeled", "axis-units", "zero-baseline", _BACKGROUND}),
     supports_single_group=False,
   ),
 )
