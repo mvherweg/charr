@@ -224,12 +224,12 @@ def _nonzero_baseline(scene: ChartScene, _config: StyleConfig, _rng: random.Rand
 
 
 def _low_background_contrast(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
-  # Paint the canvas the exact colour of one plotted series, so that series blends into the background (deltaE2000 = 0,
-  # a guaranteed low-contrast fail). The colour is one the chart already draws, so it stays in-palette and this never
-  # doubles as a palette-compliance fail; the other series stay distinct (palette colours are >= T_WITHIN apart). The
-  # compliant exemplar (_distinct_background) paints a colour far from every series, so a tinted canvas is not the cue -
-  # only whether it matches a series is.
-  scene.background = rng.choice(scene.series).color
+  # Paint the canvas the exact colour of one drawn data colour - a series, or a pie slice - so that element blends into
+  # the background (deltaE2000 = 0, a guaranteed low-contrast fail). The colour is one the chart already draws, so it
+  # stays in-palette and never doubles as a palette-compliance fail; the rest stay distinct (palette colours are
+  # >= T_WITHIN apart). The compliant exemplar (_distinct_background) paints a colour far from every drawn colour, so a
+  # tinted canvas is not the cue - only whether it matches a plotted colour is.
+  scene.background = rng.choice(_drawn_colours(scene))
 
 
 # --- compliant exemplars: positive features a rule's PASS side must *show* so its FAIL is a layout contrast, not a
@@ -242,20 +242,29 @@ def _separate_labels(scene: ChartScene, _config: StyleConfig, _rng: random.Rando
 
 
 def _distinct_background(scene: ChartScene, config: StyleConfig, _rng: random.Random) -> None:
-  # Show a deliberately high-contrast non-white background so the FAIL is "background matches a series", not merely
-  # "background is tinted". Among the palette colours the chart does not plot, take the one *farthest* from every series
-  # (the clearest available contrast): being in-palette it cannot read as a palette violation, and choosing the max-min
-  # distance avoids a near-boundary near-miss. If the chart uses the whole palette, fall back to the white norm (still
-  # high-contrast against the legible-band series).
-  series_labs = [srgb_hex_to_lab(series.color) for series in scene.series]
-  drawn = {series.color for series in scene.series}
-  unused = [colour for colour in config.palette if colour not in drawn]
-  if unused:
-    scene.background = max(unused, key=lambda colour: _min_distance(srgb_hex_to_lab(colour), series_labs))
+  # Show a deliberately high-contrast non-white background so the FAIL is "background matches a plotted colour", not
+  # merely "background is tinted". Use the in-palette colour farthest from every drawn colour; fall back to the white
+  # norm only when the chart already uses the whole palette (still high-contrast against the legible-band data).
+  distinct = _farthest_unused_palette_colour(scene, config)
+  if distinct is not None:
+    scene.background = distinct
 
 
-def _min_distance(lab: tuple[float, float, float], others: list[tuple[float, float, float]]) -> float:
-  return min(delta_e2000(lab, other) for other in others)
+def _drawn_colours(scene: ChartScene) -> list[str]:
+  # Every data colour the chart actually plots: the series colours plus, for a pie, its per-slice palette.
+  return [series.color for series in scene.series] + list(scene.palette)
+
+
+def _farthest_unused_palette_colour(scene: ChartScene, config: StyleConfig) -> str | None:
+  # The palette colour the chart does not plot that sits farthest (max of the min deltaE2000 to any drawn colour) from
+  # every plotted colour, or None when the chart already uses the whole palette. In-palette by construction, so it can
+  # never read as a palette violation; the max-min choice gives the clearest available contrast (avoids a near miss).
+  drawn = _drawn_colours(scene)
+  drawn_labs = [srgb_hex_to_lab(colour) for colour in drawn]
+  unused = [colour for colour in config.palette if colour not in set(drawn)]
+  if not unused:
+    return None
+  return max(unused, key=lambda colour: min(delta_e2000(srgb_hex_to_lab(colour), lab) for lab in drawn_labs))
 
 
 COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels, _BACKGROUND: _distinct_background}
@@ -372,7 +381,7 @@ REGISTRY: tuple[ChartType, ...] = (
     name="pie",
     kind=ChartKind.PIE,
     baseline=_pie_baseline,
-    na_rules=frozenset({"axes-labeled", "axis-units", "zero-baseline", _BACKGROUND}),
+    na_rules=frozenset({"axes-labeled", "axis-units", "zero-baseline"}),
     supports_single_group=False,
   ),
 )

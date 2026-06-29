@@ -23,7 +23,7 @@ from charr_datagen.recipes import (
   assemble,
   capable_types,
 )
-from charr_datagen.scenes import DataLabels
+from charr_datagen.scenes import ChartScene, DataLabels
 
 _CELLS = build_cells()
 _PAIRS: list[tuple[Cell, ChartType]] = [(cell, chart_type) for cell in _CELLS for chart_type in capable_types(cell)]
@@ -113,19 +113,25 @@ def test_no_overlapping_rule_is_a_symmetric_data_label_contrast() -> None:
   assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.data_labels is DataLabels.NONE
 
 
-def test_background_contrast_fail_blends_a_series_while_pass_keeps_the_background_distinct() -> None:
-  # FAIL paints the canvas the exact colour of a plotted series (it blends in); PASS paints it a colour clearly
-  # separated from every series. Both sides therefore carry a (possibly tinted) background, so a tinted canvas is not
-  # the cue - only whether it matches a series is. Pie is NA for this rule, so it never serves these cells.
+def _drawn_colours(scene: ChartScene) -> list[str]:
+  # The data colours a chart plots: series colours plus, for a pie, its per-slice palette (as recipes._drawn_colours).
+  return [series.color for series in scene.series] + list(scene.palette)
+
+
+def test_background_contrast_fail_blends_a_plotted_colour_while_pass_keeps_the_background_distinct() -> None:
+  # FAIL paints the canvas the exact colour of a plotted data colour (it blends in); PASS paints it a colour clearly
+  # separated from every plotted colour. Both sides carry a (possibly tinted) background, so a tinted canvas is not the
+  # cue - only whether it matches a plotted colour is. Pie has a background too, so it serves this rule (a slice is
+  # drawn into the canvas).
   fail = Cell("background-series-contrast", Verdict.FAIL)
   passing = Cell("background-series-contrast", Verdict.PASS)
-  for name in ("bar", "line", "scatter"):
+  for name in ("bar", "line", "scatter", "pie"):
     for seed in range(10):
       fail_scene = assemble(fail, _type_named(fail, name), _CONFIG, random.Random(seed)).scene
-      assert fail_scene.background in {series.color for series in fail_scene.series}
+      assert fail_scene.background in set(_drawn_colours(fail_scene))
       pass_scene = assemble(passing, _type_named(passing, name), _CONFIG, random.Random(seed)).scene
       background_lab = srgb_hex_to_lab(pass_scene.background)
-      assert all(delta_e2000(background_lab, srgb_hex_to_lab(series.color)) >= T_WITHIN for series in pass_scene.series)
+      assert all(delta_e2000(background_lab, srgb_hex_to_lab(c)) >= T_WITHIN for c in _drawn_colours(pass_scene))
 
 
 def test_background_contrast_fail_keeps_every_series_colour_on_the_palette() -> None:
