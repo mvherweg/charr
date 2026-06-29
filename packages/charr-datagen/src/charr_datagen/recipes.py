@@ -259,12 +259,17 @@ def _farthest_unused_palette_colour(scene: ChartScene, config: StyleConfig) -> s
   # The palette colour the chart does not plot that sits farthest (max of the min deltaE2000 to any drawn colour) from
   # every plotted colour, or None when the chart already uses the whole palette. In-palette by construction, so it can
   # never read as a palette violation; the max-min choice gives the clearest available contrast (avoids a near miss).
-  drawn = _drawn_colours(scene)
+  drawn = set(_drawn_colours(scene))
   drawn_labs = [srgb_hex_to_lab(colour) for colour in drawn]
-  unused = [colour for colour in config.palette if colour not in set(drawn)]
+  unused = [colour for colour in config.palette if colour not in drawn]
   if not unused:
     return None
-  return max(unused, key=lambda colour: min(delta_e2000(srgb_hex_to_lab(colour), lab) for lab in drawn_labs))
+
+  def _clearance(colour: str) -> float:
+    lab = srgb_hex_to_lab(colour)  # convert once per candidate, not once per (candidate, drawn) pair
+    return min(delta_e2000(lab, other) for other in drawn_labs)
+
+  return max(unused, key=_clearance)
 
 
 COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels, _BACKGROUND: _distinct_background}
