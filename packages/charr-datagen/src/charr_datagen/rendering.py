@@ -1,4 +1,4 @@
-"""Rendering backends: draw a :class:`~charr_datagen.cases.ChartScene` to a PNG with a named library.
+"""Rendering backends: draw a :class:`~charr_datagen.scenes.ChartScene` to a PNG with a named library.
 
 This module is mechanics only: given a library name it hands back a backend that renders a scene. matplotlib and seaborn
 are always available (base dependencies); plotly is optional and may not import or may lack a working static-export path
@@ -23,13 +23,22 @@ import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
 
-from charr_datagen.cases import ChartScene, ChartType
+from charr_datagen.scenes import ChartKind, ChartScene
 
 _SeabornStyle = Literal["white", "dark", "whitegrid", "darkgrid", "ticks"]
 
 MANDATORY_LIBRARIES: tuple[str, ...] = ("matplotlib", "seaborn")
 OPTIONAL_LIBRARIES: tuple[str, ...] = ("plotly",)
 ALL_LIBRARIES: tuple[str, ...] = MANDATORY_LIBRARIES + OPTIONAL_LIBRARIES
+
+# plotly uses CSS marker-symbol names; map the matplotlib markers the scenes carry onto them.
+_PLOTLY_MARKERS: dict[str, str] = {
+  "o": "circle",
+  "s": "square",
+  "^": "triangle-up",
+  "D": "diamond",
+  "v": "triangle-down",
+}
 
 
 @dataclass(frozen=True)
@@ -84,14 +93,18 @@ def _draw_matplotlib(scene: ChartScene, out: Path, *, seaborn_style: _SeabornSty
     plt.rcParams["font.family"] = scene.font_family
     figsize = (4.0, 3.0) if scene.overlap else (6.0, 4.0)
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
-    if scene.chart_type is ChartType.BAR:
+    if scene.kind is ChartKind.BAR:
       _mpl_bars(ax, scene)
-    elif scene.chart_type is ChartType.LINE:
+    elif scene.kind is ChartKind.LINE:
       _mpl_lines(ax, scene)
+    elif scene.kind is ChartKind.SCATTER:
+      _mpl_scatter(ax, scene)
     else:
       _mpl_pie(ax, scene)
     if scene.title is not None:
       ax.set_title(scene.title)
+    if scene.overlap:
+      _mpl_overlap(ax)
     fig.tight_layout()
     fig.savefig(out, format="png")
     plt.close(fig)
@@ -106,14 +119,19 @@ def _mpl_bars(ax: Axes, scene: ChartScene) -> None:
     offset = (index - (group_count - 1) / 2) * width
     ax.bar(positions + offset, series.y, width=width, label=series.name, color=series.color)
   ax.set_xticks(positions)
-  # No rotation plus long category names on a small figure is how the overlap-violation case collides legibly.
   ax.set_xticklabels(categories, rotation=0)
   _mpl_axes(ax, scene)
 
 
 def _mpl_lines(ax: Axes, scene: ChartScene) -> None:
   for series in scene.series:
-    ax.plot(series.x, series.y, marker="o", label=series.name, color=series.color)
+    ax.plot(series.x, series.y, marker=scene.marker, label=series.name, color=series.color)
+  _mpl_axes(ax, scene)
+
+
+def _mpl_scatter(ax: Axes, scene: ChartScene) -> None:
+  for series in scene.series:
+    ax.scatter(series.x, series.y, marker=scene.marker, label=series.name, color=series.color)
   _mpl_axes(ax, scene)
 
 
@@ -136,22 +154,52 @@ def _mpl_axes(ax: Axes, scene: ChartScene) -> None:
   else:
     lowest = min(value for series in scene.series for value in series.y)
     ax.set_ylim(bottom=lowest * 0.85)
+  ax.grid(visible=scene.grid)
   if scene.show_legend:
     ax.legend()
+
+
+def _mpl_overlap(ax: Axes) -> None:
+  """Stamp several long labels on top of each other so text and elements collide legibly (the no-overlap violation)."""
+  for step in range(4):
+    ax.text(
+      0.5,
+      0.55 - step * 0.04,
+      "Overlapping annotation label that collides",
+      transform=ax.transAxes,
+      ha="center",
+      fontsize=13,
+    )
 
 
 def _draw_plotly(scene: ChartScene, out: Path) -> None:
   """Render ``scene`` with plotly + kaleido; only called when :func:`plotly_usable` returned True."""
   import plotly.graph_objects as go  # noqa: PLC0415  # pyright: ignore[reportMissingImports] - optional extra
 
-  if scene.chart_type is ChartType.PIE:
+  if scene.kind is ChartKind.PIE:
     series = scene.series[0]
     traces: list[object] = [
       go.Pie(labels=[str(value) for value in series.x], values=series.y, marker={"colors": scene.palette or None}),
     ]
-  elif scene.chart_type is ChartType.LINE:
+  elif scene.kind is ChartKind.LINE:
+    symbol = _PLOTLY_MARKERS.get(scene.marker, "circle")
     traces = [
-      go.Scatter(x=series.x, y=series.y, mode="lines+markers", name=series.name, line={"color": series.color})
+      go.Scatter(
+        x=series.x,
+        y=series.y,
+        mode="lines+markers",
+        name=series.name,
+        line={"color": series.color},
+        marker={"symbol": symbol},
+      )
+      for series in scene.series
+    ]
+  elif scene.kind is ChartKind.SCATTER:
+    symbol = _PLOTLY_MARKERS.get(scene.marker, "circle")
+    traces = [
+      go.Scatter(
+        x=series.x, y=series.y, mode="markers", name=series.name, marker={"color": series.color, "symbol": symbol}
+      )
       for series in scene.series
     ]
   else:
@@ -168,7 +216,21 @@ def _draw_plotly(scene: ChartScene, out: Path) -> None:
     width=600,
     height=400,
   )
-  if scene.chart_type is not ChartType.PIE and not scene.y_baseline_zero:
+  figure.update_xaxes(showgrid=scene.grid)
+  figure.update_yaxes(showgrid=scene.grid)
+  if scene.kind is ChartKind.BAR and not scene.y_baseline_zero:
     lowest = min(value for series in scene.series for value in series.y)
-    figure.update_yaxes(range=[lowest * 0.85, max(value for series in scene.series for value in series.y) * 1.05])
+    highest = max(value for series in scene.series for value in series.y)
+    figure.update_yaxes(range=[lowest * 0.85, highest * 1.05])
+  if scene.overlap:
+    for step in range(4):
+      figure.add_annotation(
+        x=0.5,
+        y=0.55 - step * 0.06,
+        xref="paper",
+        yref="paper",
+        showarrow=False,
+        text="Overlapping annotation label that collides",
+        font={"size": 13},
+      )
   figure.write_image(out, format="png")

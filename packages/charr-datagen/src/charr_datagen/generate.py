@@ -18,9 +18,9 @@ import charr
 from charr.models import CharrError
 
 from charr_datagen import __version__
-from charr_datagen.cases import build_case, canonical_fonts, canonical_palette
 from charr_datagen.cells import Allocation, Cell, allocate, build_cells
 from charr_datagen.dataset import ManifestRecord, write_manifest
+from charr_datagen.recipes import build_case, canonical_fonts, canonical_palette
 from charr_datagen.rendering import ALL_LIBRARIES, MANDATORY_LIBRARIES, get_backend, plotly_usable
 
 MANIFEST_NAME = "labels.jsonl"
