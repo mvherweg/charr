@@ -20,3 +20,6 @@ dist/
 
 # macOS
 .DS_Store
+
+# Locally generated datasets (charr-datagen --out)
+dev-data/

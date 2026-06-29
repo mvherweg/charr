@@ -23,6 +23,7 @@ from charr_datagen.recipes import (
   assemble,
   capable_types,
 )
+from charr_datagen.scenes import DataLabels
 
 _CELLS = build_cells()
 _PAIRS: list[tuple[Cell, ChartType]] = [(cell, chart_type) for cell in _CELLS for chart_type in capable_types(cell)]
@@ -96,6 +97,20 @@ def test_font_violation_uses_a_distinct_unapproved_font() -> None:
     family = case.scene.font_family
     assert family not in _CONFIG.font_names()
     assert all(are_distinct(_FONT_BY_NAME[family], approved) for approved in _CONFIG.fonts)
+
+
+def test_no_overlapping_rule_is_a_symmetric_data_label_contrast() -> None:
+  # The fail crowds the value labels and the pass spreads the same labels, so both polarities carry labels and only the
+  # collision distinguishes them - label presence cannot leak the verdict. Unrelated cells carry no value labels.
+  fail = Cell("no-overlapping-elements", Verdict.FAIL)
+  passing = Cell("no-overlapping-elements", Verdict.PASS)
+  for name in ("bar", "line", "scatter", "pie"):
+    fail_scene = assemble(fail, _type_named(fail, name), _CONFIG, random.Random(1)).scene
+    pass_scene = assemble(passing, _type_named(passing, name), _CONFIG, random.Random(1)).scene
+    assert fail_scene.data_labels is DataLabels.COLLIDING
+    assert pass_scene.data_labels is DataLabels.SEPARATED
+  other = Cell("has-title", Verdict.PASS)
+  assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.data_labels is DataLabels.NONE
 
 
 def test_global_defects_cover_every_rule() -> None:

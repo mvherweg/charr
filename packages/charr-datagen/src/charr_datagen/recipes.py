@@ -31,11 +31,12 @@ from charr_datagen.colour import sample_off_palette
 from charr_datagen.configs import StyleConfig
 from charr_datagen.domains import DOMAINS, Domain
 from charr_datagen.fonts import sample_violation
-from charr_datagen.scenes import ChartKind, ChartScene, Series
+from charr_datagen.scenes import ChartKind, ChartScene, DataLabels, Series
 
 ALL_RULES: tuple[RuleId, ...] = tuple(rule.id for rule in BUILTIN_RULES)
 
 _LEGEND = "legend-when-multiple-groups"
+_OVERLAP = "no-overlapping-elements"
 
 _TIME_LABELS: tuple[str, ...] = ("Month", "Quarter", "Week", "Year", "Period")
 _SAMPLE_LABELS: tuple[str, ...] = ("Sample", "Observation", "Trial", "Specimen", "Measurement")
@@ -121,6 +122,8 @@ def assemble(cell: Cell, chart_type: ChartType, config: StyleConfig, rng: random
   if cell.polarity is Verdict.FAIL:
     chart_type.defect_for(cell.rule_id)(scene, config, rng)
     labels.update(_FAIL_COLLATERAL.get(cell.rule_id, {}))
+  elif cell.polarity is Verdict.PASS and (exemplar := COMPLIANT_EXEMPLARS.get(cell.rule_id)) is not None:
+    exemplar(scene, config, rng)  # show the compliant positive feature so the FAIL is a contrast, not a presence cue
   labels[cell.rule_id] = cell.polarity
   return Case(scene=scene, labels=labels)
 
@@ -187,7 +190,10 @@ def _drop_axis_labels(scene: ChartScene, _config: StyleConfig, _rng: random.Rand
 
 
 def _induce_overlap(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
-  scene.overlap = True
+  # Crowd the chart's real value labels so they collide. Reading a label ("38.1") reveals nothing about the verdict;
+  # only seeing the collision does. The compliant exemplar (_separate_labels) draws the same labels cleanly, so label
+  # presence never leaks the verdict either - the contrast is purely the overlap.
+  scene.data_labels = DataLabels.COLLIDING
 
 
 def _off_palette(scene: ChartScene, config: StyleConfig, rng: random.Random) -> None:
@@ -215,6 +221,18 @@ def _remove_legend(scene: ChartScene, _config: StyleConfig, _rng: random.Random)
 
 def _nonzero_baseline(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
   scene.y_baseline_zero = False
+
+
+# --- compliant exemplars: positive features a rule's PASS side must *show* so its FAIL is a layout contrast, not a
+# presence cue. Only no-overlapping needs one: its FAIL crowds the value labels (above), so its PASS must draw the same
+# labels cleanly separated. Every other rule's baseline is already a clean pass, so the table holds just this entry.
+
+
+def _separate_labels(scene: ChartScene, _config: StyleConfig, _rng: random.Random) -> None:
+  scene.data_labels = DataLabels.SEPARATED
+
+
+COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels}
 
 
 GLOBAL_DEFECTS: dict[RuleId, Injector] = {
