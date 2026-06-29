@@ -52,3 +52,6 @@ alternatives are still live instead of being reverse-engineered in code review.
 | 0016 | [The labeled-chart dataset is multi-label](0016-multi-label-chart-dataset.md)                                                    | Accepted |
 | 0017 | [Score per rule from a 3-class confusion substrate; fail-class P/R headline](0017-eval-metrics-from-confusion-substrate.md)      | Accepted |
 | 0018 | [Generator structure: a data-driven chart-type registry with label-neutral variety](0018-generator-structure-recipe-registry.md) | Accepted |
+| 0019 | [Multi-config sweep: sample independent palette/font style-configs into separate datasets](0019-multi-config-style-sweep.md)     | Accepted |
+| 0020 | [Colour sampling for style-configs: CIEDE2000 distance with bounded-retry rejection](0020-colour-sampling-ciede2000.md)          | Accepted |
+| 0021 | [Bundled fonts: a property-distinct supported set, with delivery verified per backend](0021-bundled-fonts-and-delivery.md)       | Accepted |
