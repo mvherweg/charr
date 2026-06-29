@@ -98,22 +98,37 @@ generated or hand-curated.
 
 ## Extending the generator (charr-datagen)
 
-The generator is a registry of data (see [docs/adr/0018](docs/adr/0018-generator-structure-recipe-registry.md) for the
-why; fuller docs are tracked in issue #9). The one rule that keeps ground-truth labels correct: a knob is either
-**label-bearing** (it changes a verdict - title/axis/units/legend presence, palette, font, baseline) and is set by the
-recipe, or **label-neutral** (subject vocabulary, numbers, colours within the palette, grid, marker, series count) and
+The generator is a registry of data (see [docs/adr/0018](docs/adr/0018-generator-structure-recipe-registry.md) and
+[0019-0021](docs/adr/README.md) for the why; fuller docs are tracked in issue #9). The one rule that keeps ground-truth
+labels correct: a knob is either **label-bearing** (it changes a verdict) and is controlled, or **label-neutral**
+(subject vocabulary, numbers, which palette colour/approved font a compliant chart uses, grid, marker, series count) and
 is randomized freely from the seeded RNG. Never randomize a label-bearing knob.
+
+Palette and font are label-bearing only *relative to a declared expectation*. That expectation is a **style-config**: a
+run samples N independent `(palette, approved-fonts)` configs (`configs.py`) and writes one self-describing dataset per
+config under `out_dir/config-NN/`, each with its own `charr.toml`. The recipe draws a *compliant* chart's colours from
+the config palette and its font from the approved set, and draws each *violation* outside the config - a colour beyond
+`T_VIOLATION` of the palette in CIEDE2000 (`colour.py`), or a font differing by a distinguishing property from every
+approved font (`fonts.py`). So the label stays exact for any sampled config.
 
 - **Add subject variety:** append a `Domain` literal to `DOMAINS` in `domains.py`. Domains are pure label-neutral
   vocabulary, so the weirder the better (see `improbable`, `mundane-absurd`).
 - **Add a chart type:** append a `ChartType` to `REGISTRY` in `recipes.py` with a compliant-`baseline` builder, its
   `na_rules` (rules structurally impossible for it), `supports_single_group`, and - rarely - any type-specific
   `extra_defects` (the eight built-in rules are all covered by the shared `GLOBAL_DEFECTS`, so this is usually empty).
+- **Add a font:** bundle the `.ttf` under `charr_datagen/fonts/` (OFL/Apache; record it in `fonts/LICENSES/NOTICE.md`)
+  and append a `Font` to `SUPPORTED_FONTS` in `fonts.py` with its distinguishing properties (`serifs`/`monospaced`/
+  `script`). Keep the supported set mutually distinct: a violation is any supported font in a *different* bucket, so two
+  fonts that share all three properties are siblings (compliant variety only), never a violation pair.
+- **Tune the style space:** the palette/font-count ranges live in `configs.py`; the colour distinctness thresholds and
+  the legible band live in `colour.py` (calibrated as CIEDE2000 JND multiples - re-check the density/retry test if you
+  change them).
 
 The generic tests in `tests/test_recipes.py` then validate the addition automatically: `capable_types` proves every
 `(rule, polarity)` cell stays servable (pure metadata, no seed), and the label tests prove each `(cell, type)` is
-correct and seed-invariant. If you add a rule and no chart type can serve one of its cells, the coverage test fails with
-a precise message - run `uv run pytest packages/charr-datagen` after any change here.
+correct and invariant across seeds and sampled configs. `tests/test_fonts.py` proves the supported set always leaves a
+distinct violation. If you add a rule and no chart type can serve one of its cells, the coverage test fails with a
+precise message - run `uv run pytest packages/charr-datagen` after any change here.
 
 ## Decisions (ADRs)
 
@@ -140,11 +155,11 @@ uv run charr check ./charts
 # point at single files or a simple glob too (no ** recursion yet)
 uv run charr check report.png "charts/*.png"
 
-# generate a labeled dataset (images + JSONL manifest + checker config + run metadata)
-uv run charr-datagen generate --out ./set --seed 0
+# generate a multi-config dataset sweep (one self-describing config-NN/ dataset per style-config)
+uv run charr-datagen generate --out ./set --configs 4 --samples 60 --seed 0
 
-# score the checker against one or more manifests (needs CHARR_LLM_* set; manual/dev use)
-uv run charr-eval ./set/labels.jsonl
+# score the checker across every config's manifest (unioned; needs CHARR_LLM_* set; manual/dev use)
+uv run charr-eval ./set/*/labels.jsonl
 ```
 
 The checker prints **JSON only** and exits **non-zero when any enabled, non-excepted rule fails** (1 = a rule failed,

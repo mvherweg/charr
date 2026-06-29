@@ -21,9 +21,12 @@ from typing import Literal
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from matplotlib import font_manager
 from matplotlib.axes import Axes
 
-from charr_datagen.scenes import ChartKind, ChartScene
+from charr_datagen.errors import DatagenError
+from charr_datagen.fonts import SUPPORTED_FONTS, font_path
+from charr_datagen.scenes import ChartKind, ChartScene, DataLabels
 
 _SeabornStyle = Literal["white", "dark", "whitegrid", "darkgrid", "ticks"]
 
@@ -32,6 +35,8 @@ OPTIONAL_LIBRARIES: tuple[str, ...] = ("plotly",)
 ALL_LIBRARIES: tuple[str, ...] = MANDATORY_LIBRARIES + OPTIONAL_LIBRARIES
 
 # plotly uses CSS marker-symbol names; map the matplotlib markers the scenes carry onto them.
+_MAX_DATA_LABELS = 5  # representative value labels drawn for the no-overlapping-elements rule (both polarities)
+
 _PLOTLY_MARKERS: dict[str, str] = {
   "o": "circle",
   "s": "square",
@@ -91,8 +96,7 @@ def _draw_matplotlib(scene: ChartScene, out: Path, *, seaborn_style: _SeabornSty
     if seaborn_style is not None:
       sns.set_theme(style=seaborn_style)
     plt.rcParams["font.family"] = scene.font_family
-    figsize = (4.0, 3.0) if scene.overlap else (6.0, 4.0)
-    fig, ax = plt.subplots(figsize=figsize, dpi=100)
+    fig, ax = plt.subplots(figsize=(6.0, 4.0), dpi=100)
     if scene.kind is ChartKind.BAR:
       _mpl_bars(ax, scene)
     elif scene.kind is ChartKind.LINE:
@@ -103,8 +107,7 @@ def _draw_matplotlib(scene: ChartScene, out: Path, *, seaborn_style: _SeabornSty
       _mpl_pie(ax, scene)
     if scene.title is not None:
       ax.set_title(scene.title)
-    if scene.overlap:
-      _mpl_overlap(ax)
+    _mpl_data_labels(ax, scene)
     fig.tight_layout()
     fig.savefig(out, format="png")
     plt.close(fig)
@@ -159,17 +162,32 @@ def _mpl_axes(ax: Axes, scene: ChartScene) -> None:
     ax.legend()
 
 
-def _mpl_overlap(ax: Axes) -> None:
-  """Stamp several long labels on top of each other so text and elements collide legibly (the no-overlap violation)."""
-  for step in range(4):
-    ax.text(
-      0.5,
-      0.55 - step * 0.04,
-      "Overlapping annotation label that collides",
-      transform=ax.transAxes,
-      ha="center",
-      fontsize=13,
-    )
+def _mpl_data_labels(ax: Axes, scene: ChartScene) -> None:
+  """Draw the first series' real value labels per :func:`_data_label_layout` (the no-overlapping-elements rule)."""
+  if scene.data_labels is DataLabels.NONE:
+    return
+  anchors, fontsize = _data_label_layout(scene)
+  for x, y, text in anchors:
+    ax.text(x, y, text, transform=ax.transAxes, ha="center", va="center", fontsize=fontsize)
+
+
+def _data_label_layout(scene: ChartScene) -> tuple[list[tuple[float, float, str]], int]:
+  """Axes-fraction ``(x, y, text)`` anchors plus a font size for the first series' value labels, shared by all backends.
+
+  Both polarities draw the same real values, so neither the presence nor the content of the labels can leak the
+  no-overlapping verdict - only the layout does. ``COLLIDING`` stacks them at one x in a tight band so they pile into a
+  guaranteed collision; ``SEPARATED`` spreads them across a clear band. Positioning by figure fraction (not by the
+  backend's own label auto-placement) keeps the collision true by construction on every backend.
+  """
+  # Cap to a few representative points so the SEPARATED row stays unambiguously clear even on a dense scatter; both
+  # polarities draw the same count, so the cap does not become a presence cue.
+  texts = [f"{value:g}" for value in scene.series[0].y[:_MAX_DATA_LABELS]]
+  count = len(texts)
+  if scene.data_labels is DataLabels.COLLIDING:
+    ys = np.linspace(0.80, 0.90, count)
+    return [(0.5, float(y), text) for y, text in zip(ys, texts, strict=True)], 14
+  xs = np.linspace(0.07, 0.93, count)
+  return [(float(x), 0.9, text) for x, text in zip(xs, texts, strict=True)], 9
 
 
 def _draw_plotly(scene: ChartScene, out: Path) -> None:
@@ -222,15 +240,36 @@ def _draw_plotly(scene: ChartScene, out: Path) -> None:
     lowest = min(value for series in scene.series for value in series.y)
     highest = max(value for series in scene.series for value in series.y)
     figure.update_yaxes(range=[lowest * 0.85, highest * 1.05])
-  if scene.overlap:
-    for step in range(4):
-      figure.add_annotation(
-        x=0.5,
-        y=0.55 - step * 0.06,
-        xref="paper",
-        yref="paper",
-        showarrow=False,
-        text="Overlapping annotation label that collides",
-        font={"size": 13},
-      )
+  if scene.data_labels is not DataLabels.NONE:
+    anchors, fontsize = _data_label_layout(scene)
+    for x, y, text in anchors:
+      figure.add_annotation(x=x, y=y, xref="paper", yref="paper", showarrow=False, text=text, font={"size": fontsize})
   figure.write_image(out, format="png")
+
+
+def _register_bundled_fonts() -> None:
+  """Register every bundled font with matplotlib and verify none silently falls back to a different family.
+
+  matplotlib renders a registered font faithfully, so a chart drawn in an approved font really shows it - which is why
+  font-compliance ground truth is trusted on matplotlib/seaborn (and held ``not_applicable`` on plotly, docs/adr/0021).
+  A missing file or a fallback to a different family raises rather than mislabelling an image.
+  """
+  for font in SUPPORTED_FONTS:
+    path = font_path(font)
+    if not path.is_file():
+      msg = f"bundled font missing: {path}"
+      raise DatagenError(msg)
+    font_manager.fontManager.addfont(str(path))
+  for font in SUPPORTED_FONTS:
+    try:
+      resolved = font_manager.findfont(font.name, fallback_to_default=False)
+    except ValueError as exc:
+      msg = f"bundled font {font.name!r} did not register with matplotlib"
+      raise DatagenError(msg) from exc
+    family = font_manager.FontProperties(fname=resolved).get_name()
+    if family != font.name:
+      msg = f"font {font.name!r} resolves to {family!r}: registration failed or a silent fallback occurred"
+      raise DatagenError(msg)
+
+
+_register_bundled_fonts()
