@@ -93,6 +93,7 @@ class _RunContext:
   active: list[str]
   backends: dict[str, Backend]
   seed: int
+  samples: int
 
 
 def generate(  # noqa: PLR0913 - these are the generator's public knobs; bundling them would obscure the CLI surface.
@@ -126,7 +127,11 @@ def generate(  # noqa: PLR0913 - these are the generator's public knobs; bundlin
   _ensure_parent(out_dir)
   out_dir.mkdir(exist_ok=True)
   context = _RunContext(
-    allocation=allocation, active=active, backends={name: get_backend(name) for name in active}, seed=seed
+    allocation=allocation,
+    active=active,
+    backends={name: get_backend(name) for name in active},
+    seed=seed,
+    samples=budget,
   )
   style_configs = sample_configs(configs, seed)
 
@@ -196,7 +201,7 @@ def _generate_one(config_dir: Path, config: StyleConfig, config_index: int, cont
       index += 1
   write_manifest(config_dir / MANIFEST_NAME, records)
   _write_config(config_dir / CONFIG_NAME, config)
-  _write_config_meta(config_dir / META_NAME, config, context.allocation)
+  _write_config_meta(config_dir / META_NAME, config, context)
   return ConfigResult(config=config, out_dir=config_dir, image_count=len(records))
 
 
@@ -257,10 +262,21 @@ def _write_config(path: Path, config: StyleConfig) -> None:
   path.write_text(body, encoding="ascii")
 
 
-def _write_config_meta(path: Path, config: StyleConfig, allocation: Allocation) -> None:
-  """Write a config's ``meta.json``: its sampled palette and fonts, plus the realized cell allocation."""
+def _write_config_meta(path: Path, config: StyleConfig, context: _RunContext) -> None:
+  """Write a config's ``meta.json`` so a copied ``config-NN/`` stays self-describing (docs/adr/0019).
+
+  Alongside the sampled palette/fonts and the realized cell allocation it records the run inputs needed to reproduce
+  this config in isolation - generator/checker versions, the base seed, the per-config sample budget, and the active
+  library set - which the run-level ``meta.json`` would otherwise hold alone.
+  """
+  allocation = context.allocation
   meta = {
+    "charr_datagen_version": __version__,
+    "charr_version": charr.__version__,
     "config": config.name,
+    "seed": context.seed,
+    "samples_per_config": context.samples,
+    "libraries": list(context.active),
     "palette": list(config.palette),
     "fonts": config.font_names(),
     "cells": [

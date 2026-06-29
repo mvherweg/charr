@@ -33,6 +33,11 @@ def test_generate_writes_per_config_artifacts(tmp_path: Path) -> None:
   assert config_meta["config"] == "config-00"
   assert config_meta["palette"]
   assert config_meta["fonts"]
+  # A copied config-NN must stay reproducible in isolation (docs/adr/0019), so it carries the run inputs too.
+  assert config_meta["seed"] == 0
+  assert config_meta["samples_per_config"] == len(build_cells())
+  assert config_meta["libraries"] == ["matplotlib"]
+  assert config_meta["charr_datagen_version"]
 
 
 def test_generate_writes_a_run_index(tmp_path: Path) -> None:
