@@ -49,7 +49,7 @@ def test_main_scores_a_manifest_end_to_end_with_a_fake_backend(
   assert exit_code == cli.EXIT_OK
   assert "== overall ==" in capsys.readouterr().out
   assert substrate_out.is_file()
-  assert substrate_out.read_text(encoding="ascii").strip()
+  assert substrate_out.read_text(encoding="utf-8").strip()
 
 
 def test_main_persists_a_non_ascii_rationale_as_utf8(
