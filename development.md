@@ -85,6 +85,10 @@ Charr/
       pyproject.toml
       src/charr_eval/
       tests/
+    charr-review/           # the review web app - browse an eval run's results (depends on charr; uses Flask)
+      pyproject.toml
+      src/charr_review/
+      tests/
   project.md
   development.md
   docs/adr/                 # Architecture Decision Records (committed; the "why" trace)
@@ -92,9 +96,10 @@ Charr/
 ```
 
 The packages are kept apart on purpose (docs/adr/0010): a user of the checker is not necessarily interested in
-generating data or scoring runs. `charr-datagen` and `charr-eval` both depend on `charr` (for the shared rule catalog
-and verdict vocabulary) but never on each other, so the evaluator can score any dataset in the manifest format,
-generated or hand-curated.
+generating data or scoring runs. `charr-datagen`, `charr-eval`, and `charr-review` each depend on `charr` (for the
+shared rule catalog and verdict vocabulary) but never on one another. The evaluator scores any dataset in the manifest
+format, generated or hand-curated; the reviewer reads the evaluator's substrate by re-declaring its record rather than
+importing it, treating both the manifest and the substrate as published contracts (docs/adr/0022).
 
 ## Extending the generator (charr-datagen)
 
@@ -160,6 +165,10 @@ uv run charr-datagen generate --out ./set --configs 4 --samples 60 --seed 0
 
 # score the checker across every config's manifest (unioned; needs CHARR_LLM_* set; manual/dev use)
 uv run charr-eval ./set/*/labels.jsonl
+
+# browse an eval run image-by-image (read-only): expected vs predicted verdicts + the model's rationale
+# pass the substrate plus the dataset root it was scored against (one substrate <-> one dataset; docs/adr/0022)
+uv run charr-review ./charr-eval-substrate.jsonl --dataset-dir ./set/config-00
 ```
 
 The checker prints **JSON only** and exits **non-zero when any enabled, non-excepted rule fails** (1 = a rule failed,
