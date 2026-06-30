@@ -178,6 +178,39 @@ def test_non_gridline_cells_keep_the_neutral_grey_grid() -> None:
   assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.gridline_color == "#b0b0b0"
 
 
+def test_gridline_weight_fail_makes_the_grid_compete_while_pass_keeps_it_thin() -> None:
+  # FAIL strokes the grid at least as heavily as the data lines (ratio >= 1.0, so it competes with the data); PASS keeps
+  # it clearly thinner (ratio <= 0.5). The (0.5, 1.0) middle is never generated, so labels stay unambiguous. Both force
+  # the grid on, so a visible grid is not the cue - only its weight relative to the lines is.
+  fail = Cell("gridline-weight", Verdict.FAIL)
+  passing = Cell("gridline-weight", Verdict.PASS)
+  for seed in range(10):
+    fail_scene = assemble(fail, _type_named(fail, "line"), _CONFIG, random.Random(seed)).scene
+    assert fail_scene.grid is True
+    assert fail_scene.gridline_width / fail_scene.series_width >= 1.0
+    pass_scene = assemble(passing, _type_named(passing, "line"), _CONFIG, random.Random(seed)).scene
+    assert pass_scene.grid is True
+    assert pass_scene.gridline_width / pass_scene.series_width <= 0.5
+
+
+def test_gridline_weight_is_not_applicable_off_line_charts() -> None:
+  # The rule compares the grid stroke to the series *line* weight, so only the line type can serve its pass/fail; bar,
+  # scatter, and pie have no line to compare against and serve only its NA cell.
+  fail = Cell("gridline-weight", Verdict.FAIL)
+  assert [chart_type.name for chart_type in capable_types(fail)] == ["line"]
+  na = Cell("gridline-weight", Verdict.NOT_APPLICABLE)
+  assert {chart_type.name for chart_type in capable_types(na)} == {"bar", "scatter", "pie"}
+  for name in ("bar", "scatter", "pie"):
+    case = assemble(na, _type_named(na, name), _CONFIG, random.Random(1))
+    assert case.labels[na.rule_id] is Verdict.NOT_APPLICABLE
+
+
+def test_non_gridline_weight_cells_keep_the_default_stroke_widths() -> None:
+  other = Cell("has-title", Verdict.PASS)
+  scene = assemble(other, _type_named(other, "line"), _CONFIG, random.Random(1)).scene
+  assert (scene.series_width, scene.gridline_width) == (2.0, 0.8)
+
+
 def test_global_defects_cover_every_rule() -> None:
   assert set(GLOBAL_DEFECTS) == set(ALL_RULES)
 

@@ -53,7 +53,11 @@ class ChartScene:
   ``background`` is the plot canvas colour and drives the background-series-contrast rule: the dataset norm is white,
   a violation sets it near a plotted colour (within ``T_WITHIN``, so that element blends in). ``gridline_color`` is the
   grid colour (the dataset norm is a neutral grey) and drives the gridline-series-contrast rule, set near a series'
-  colour to make the gridlines read as data. ``grid`` and ``marker`` are cosmetic, label-neutral jitter.
+  colour to make the gridlines read as data. ``series_width`` and ``gridline_width`` are stroke weights driving the
+  gridline-weight rule: the norm keeps the grid thinner than the data lines, a violation sets ``gridline_width`` at or
+  above ``series_width`` so the grid competes with the data. That ratio only bears on a verdict for line charts (the
+  rule is not_applicable where the data is not a stroke); on other types the widths are inert. ``grid`` and ``marker``
+  are cosmetic, label-neutral jitter.
   """
 
   kind: ChartKind
@@ -67,6 +71,8 @@ class ChartScene:
   data_labels: DataLabels = DataLabels.NONE
   background: str = "#ffffff"
   gridline_color: str = "#b0b0b0"
+  series_width: float = 2.0
+  gridline_width: float = 0.8
   grid: bool = True
   marker: str = "o"
   palette: list[str] = field(default_factory=list)

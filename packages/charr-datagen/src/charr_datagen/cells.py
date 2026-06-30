@@ -26,6 +26,7 @@ _POLARITIES_BY_RULE: dict[RuleId, tuple[Verdict, ...]] = {
   "zero-baseline": (Verdict.FAIL, Verdict.PASS, Verdict.NOT_APPLICABLE),
   "background-series-contrast": (Verdict.FAIL, Verdict.PASS),
   "gridline-series-contrast": (Verdict.FAIL, Verdict.PASS, Verdict.NOT_APPLICABLE),
+  "gridline-weight": (Verdict.FAIL, Verdict.PASS, Verdict.NOT_APPLICABLE),
 }
 
 

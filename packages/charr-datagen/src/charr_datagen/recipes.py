@@ -38,6 +38,14 @@ _LEGEND = "legend-when-multiple-groups"
 _OVERLAP = "no-overlapping-elements"
 _BACKGROUND = "background-series-contrast"
 _GRIDLINE = "gridline-series-contrast"
+_GRIDWEIGHT = "gridline-weight"
+
+# gridline-weight is constructed as a ratio of gridline stroke width to series line width. FAIL paints the grid at least
+# as heavy as the lines (ratio >= _HEAVY_RATIO_MIN, so it competes with the data); the PASS exemplar keeps it clearly
+# thinner (ratio <= _LIGHT_RATIO_MAX). The (_LIGHT_RATIO_MAX, _HEAVY_RATIO_MIN) middle is never generated, so labels
+# stay unambiguous. The scene's default widths sit below _LIGHT_RATIO_MAX, so the norm grid is a clean pass.
+_HEAVY_RATIO_MIN = 1.0
+_LIGHT_RATIO_MAX = 0.5
 
 _TIME_LABELS: tuple[str, ...] = ("Month", "Quarter", "Week", "Year", "Period")
 _SAMPLE_LABELS: tuple[str, ...] = ("Sample", "Observation", "Trial", "Specimen", "Measurement")
@@ -242,6 +250,15 @@ def _low_gridline_contrast(scene: ChartScene, _config: StyleConfig, rng: random.
   scene.gridline_color = sample_near(rng, rng.choice(_drawn_colours(scene)))
 
 
+def _heavy_gridlines(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
+  # Show the grid and stroke it at least as heavily as the data lines (gridline >= series width), so the gridlines
+  # compete with the data. Only injected on line charts (the rule is NA elsewhere). The grid keeps its neutral colour,
+  # so this is purely a weight defect. The compliant exemplar (_light_gridlines) shows a thin grid, so a visible grid is
+  # not the cue - only its weight relative to the lines is.
+  scene.grid = True
+  scene.gridline_width = scene.series_width * rng.uniform(_HEAVY_RATIO_MIN, 1.5)
+
+
 # --- compliant exemplars: positive features a rule's PASS side must *show* so its FAIL is a layout contrast, not a
 # presence cue. Only no-overlapping needs one: its FAIL crowds the value labels (above), so its PASS must draw the same
 # labels cleanly separated. Every other rule's baseline is already a clean pass, so the table holds just this entry.
@@ -266,6 +283,13 @@ def _distinct_gridlines(scene: ChartScene, _config: StyleConfig, rng: random.Ran
   scene.gridline_color = sample_far_from(rng, _drawn_colours(scene))
 
 
+def _light_gridlines(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
+  # Show the grid stroked clearly thinner than the data lines (gridline <= half the series width), so it recedes behind
+  # the data - a clean pass. Both polarities force the grid on, so a visible grid is not the cue; only its weight is.
+  scene.grid = True
+  scene.gridline_width = scene.series_width * rng.uniform(0.2, _LIGHT_RATIO_MAX)
+
+
 def _drawn_colours(scene: ChartScene) -> list[str]:
   # Every data colour the chart actually plots: the series colours plus, for a pie, its per-slice palette.
   return [series.color for series in scene.series] + list(scene.palette)
@@ -275,6 +299,7 @@ COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {
   _OVERLAP: _separate_labels,
   _BACKGROUND: _distinct_background,
   _GRIDLINE: _distinct_gridlines,
+  _GRIDWEIGHT: _light_gridlines,
 }
 
 
@@ -289,6 +314,7 @@ GLOBAL_DEFECTS: dict[RuleId, Injector] = {
   "zero-baseline": _nonzero_baseline,
   _BACKGROUND: _low_background_contrast,
   _GRIDLINE: _low_gridline_contrast,
+  _GRIDWEIGHT: _heavy_gridlines,
 }
 
 
@@ -370,8 +396,16 @@ def _pie_baseline(domain: Domain, config: StyleConfig, rng: random.Random, *, mu
   )
 
 
+# gridline-weight compares the grid stroke to the *series line* weight, so it only applies where the data is a line: it
+# is NA for bar, scatter, and pie (no line to compare against), served as a pass/fail only by the line type.
 REGISTRY: tuple[ChartType, ...] = (
-  ChartType(name="bar", kind=ChartKind.BAR, baseline=_bar_baseline, na_rules=frozenset(), supports_single_group=True),
+  ChartType(
+    name="bar",
+    kind=ChartKind.BAR,
+    baseline=_bar_baseline,
+    na_rules=frozenset({_GRIDWEIGHT}),
+    supports_single_group=True,
+  ),
   ChartType(
     name="line",
     kind=ChartKind.LINE,
@@ -383,14 +417,14 @@ REGISTRY: tuple[ChartType, ...] = (
     name="scatter",
     kind=ChartKind.SCATTER,
     baseline=_scatter_baseline,
-    na_rules=frozenset({"zero-baseline"}),
+    na_rules=frozenset({"zero-baseline", _GRIDWEIGHT}),
     supports_single_group=True,
   ),
   ChartType(
     name="pie",
     kind=ChartKind.PIE,
     baseline=_pie_baseline,
-    na_rules=frozenset({"axes-labeled", "axis-units", "zero-baseline", _GRIDLINE}),
+    na_rules=frozenset({"axes-labeled", "axis-units", "zero-baseline", _GRIDLINE, _GRIDWEIGHT}),
     supports_single_group=False,
   ),
 )
