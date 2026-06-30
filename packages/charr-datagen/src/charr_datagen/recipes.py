@@ -3,8 +3,7 @@
 This is the heart of the generator (docs/adr/0018). A chart type is **data**: a compliant-baseline builder, the set of
 rules that are structurally ``not_applicable`` for it (``na_rules``), whether it can be drawn single-group (which makes
 the legend NA), and a table of type-specific defect overrides (empty for the current four types - every defect for the
-eight built-in rules turns out to operate on shared scene fields, so the shared :data:`GLOBAL_DEFECTS` table covers
-them all).
+built-in rules turns out to operate on shared scene fields, so the shared :data:`GLOBAL_DEFECTS` table covers them all).
 
 Labels stay correct by construction. A chart's verdict vector is a function of its ``(cell, type)`` and the single
 defect injected; the style-config (docs/adr/0019) supplies the palette and approved fonts but never changes a verdict,
@@ -27,7 +26,7 @@ from charr.models import RuleId, Verdict
 from charr.rules import BUILTIN_RULES
 
 from charr_datagen.cells import Cell
-from charr_datagen.colour import sample_off_palette
+from charr_datagen.colour import sample_far_from, sample_near, sample_off_palette
 from charr_datagen.configs import StyleConfig
 from charr_datagen.domains import DOMAINS, Domain
 from charr_datagen.fonts import sample_violation
@@ -37,6 +36,7 @@ ALL_RULES: tuple[RuleId, ...] = tuple(rule.id for rule in BUILTIN_RULES)
 
 _LEGEND = "legend-when-multiple-groups"
 _OVERLAP = "no-overlapping-elements"
+_BACKGROUND = "background-series-contrast"
 
 _TIME_LABELS: tuple[str, ...] = ("Month", "Quarter", "Week", "Year", "Period")
 _SAMPLE_LABELS: tuple[str, ...] = ("Sample", "Observation", "Trial", "Specimen", "Measurement")
@@ -223,6 +223,15 @@ def _nonzero_baseline(scene: ChartScene, _config: StyleConfig, _rng: random.Rand
   scene.y_baseline_zero = False
 
 
+def _low_background_contrast(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
+  # Paint the canvas a colour within T_WITHIN (deltaE2000) of one plotted mark, so that mark is not reliably
+  # distinguishable from the background and blends in. The rule judges background-vs-marks irrespective of the palette,
+  # so the background may be any colour (off-palette is fine, exactly as the white/grey/black chrome already is). The
+  # compliant exemplar (_distinct_background) keeps the canvas far from every mark, so a tinted canvas is not the cue -
+  # only whether it lands near a mark is.
+  scene.background = sample_near(rng, rng.choice(_drawn_colours(scene)))
+
+
 # --- compliant exemplars: positive features a rule's PASS side must *show* so its FAIL is a layout contrast, not a
 # presence cue. Only no-overlapping needs one: its FAIL crowds the value labels (above), so its PASS must draw the same
 # labels cleanly separated. Every other rule's baseline is already a clean pass, so the table holds just this entry.
@@ -232,7 +241,19 @@ def _separate_labels(scene: ChartScene, _config: StyleConfig, _rng: random.Rando
   scene.data_labels = DataLabels.SEPARATED
 
 
-COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels}
+def _distinct_background(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
+  # Paint the canvas a colour at least T_VIOLATION (deltaE2000) from every plotted mark, so nothing blends - a clean,
+  # unambiguous pass. Both polarities carry a sampled (non-white) background, so a tinted canvas is not the cue; only
+  # whether it lands near a mark is.
+  scene.background = sample_far_from(rng, _drawn_colours(scene))
+
+
+def _drawn_colours(scene: ChartScene) -> list[str]:
+  # Every data colour the chart actually plots: the series colours plus, for a pie, its per-slice palette.
+  return [series.color for series in scene.series] + list(scene.palette)
+
+
+COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels, _BACKGROUND: _distinct_background}
 
 
 GLOBAL_DEFECTS: dict[RuleId, Injector] = {
@@ -244,6 +265,7 @@ GLOBAL_DEFECTS: dict[RuleId, Injector] = {
   "axis-units": _drop_units,
   _LEGEND: _remove_legend,
   "zero-baseline": _nonzero_baseline,
+  _BACKGROUND: _low_background_contrast,
 }
 
 

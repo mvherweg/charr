@@ -12,6 +12,8 @@ from charr_datagen.colour import (
   T_VIOLATION,
   T_WITHIN,
   delta_e2000,
+  sample_far_from,
+  sample_near,
   sample_off_palette,
   sample_palette,
   srgb_hex_to_lab,
@@ -76,6 +78,27 @@ def test_off_palette_colour_is_far_from_every_palette_colour(size: int) -> None:
     violation = srgb_hex_to_lab(sample_off_palette(rng, palette))
     for colour in palette:
       assert delta_e2000(violation, srgb_hex_to_lab(colour)) >= T_VIOLATION
+
+
+@pytest.mark.parametrize("size", [1, 3, 6])
+def test_sample_far_from_clears_every_given_colour(size: int) -> None:
+  # The general "keep clear of these" primitive the readability rules use for a clean-pass background/gridline.
+  for seed in range(20):
+    rng = random.Random(seed)
+    colours = sample_palette(rng, size)
+    far = srgb_hex_to_lab(sample_far_from(rng, colours))
+    for colour in colours:
+      assert delta_e2000(far, srgb_hex_to_lab(colour)) >= T_VIOLATION
+
+
+def test_sample_near_lands_within_the_blend_band_of_the_target() -> None:
+  # The "blend" primitive: a background/gridline this close to a mark is not reliably distinguishable from it. Run many
+  # seeds because the perturbation sampler must succeed reliably, not just on average.
+  for seed in range(50):
+    rng = random.Random(seed)
+    target = sample_palette(rng, 1)[0]
+    near = sample_near(rng, target)
+    assert delta_e2000(srgb_hex_to_lab(near), srgb_hex_to_lab(target)) <= T_WITHIN
 
 
 def test_sampling_terminates_with_a_wide_retry_margin() -> None:

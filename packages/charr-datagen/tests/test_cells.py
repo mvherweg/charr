@@ -3,7 +3,7 @@
 import pytest
 from charr.models import Verdict
 from charr.rules import BUILTIN_RULES
-from charr_datagen.cells import Cell, allocate, build_cells
+from charr_datagen.cells import _POLARITIES_BY_RULE, Cell, allocate, build_cells
 
 
 def test_build_cells_covers_every_rule_with_fail_and_pass() -> None:
@@ -14,8 +14,14 @@ def test_build_cells_covers_every_rule_with_fail_and_pass() -> None:
     assert Verdict.PASS in polarities
 
 
-def test_build_cells_yields_twenty_cells() -> None:
-  assert len(build_cells()) == 20
+def test_build_cells_yields_exactly_the_declared_rule_polarity_cells() -> None:
+  # The catalog is one cell per (rule, polarity) declared in _POLARITIES_BY_RULE - nothing dropped, invented, or
+  # duplicated. Deriving the expectation from the same map needs no magic count to bump, yet still guards build_cells's
+  # primary/NA split, and (with the length check) a duplicated polarity.
+  cells = build_cells()
+  expected = {Cell(rule.id, polarity) for rule in BUILTIN_RULES for polarity in _POLARITIES_BY_RULE[rule.id]}
+  assert set(cells) == expected
+  assert len(cells) == len(expected)
 
 
 def test_priority_order_puts_all_fail_and_pass_before_any_not_applicable() -> None:

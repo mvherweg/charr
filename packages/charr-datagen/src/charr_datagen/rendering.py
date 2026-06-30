@@ -97,6 +97,8 @@ def _draw_matplotlib(scene: ChartScene, out: Path, *, seaborn_style: _SeabornSty
       sns.set_theme(style=seaborn_style)
     plt.rcParams["font.family"] = scene.font_family
     fig, ax = plt.subplots(figsize=(6.0, 4.0), dpi=100)
+    fig.set_facecolor(scene.background)
+    ax.set_facecolor(scene.background)  # the plot canvas a series must contrast with (background-series-contrast rule)
     if scene.kind is ChartKind.BAR:
       _mpl_bars(ax, scene)
     elif scene.kind is ChartKind.LINE:
@@ -109,7 +111,7 @@ def _draw_matplotlib(scene: ChartScene, out: Path, *, seaborn_style: _SeabornSty
       ax.set_title(scene.title)
     _mpl_data_labels(ax, scene)
     fig.tight_layout()
-    fig.savefig(out, format="png")
+    fig.savefig(out, format="png", facecolor=scene.background)  # keep the canvas colour in the saved PNG
     plt.close(fig)
 
 
@@ -231,6 +233,8 @@ def _draw_plotly(scene: ChartScene, out: Path) -> None:
     yaxis_title=scene.y_label,
     showlegend=scene.show_legend,
     font={"family": scene.font_family},
+    paper_bgcolor=scene.background,
+    plot_bgcolor=scene.background,  # the canvas a series must contrast with (background-series-contrast rule)
     width=600,
     height=400,
   )

@@ -24,6 +24,7 @@ _POLARITIES_BY_RULE: dict[RuleId, tuple[Verdict, ...]] = {
   "axis-units": (Verdict.FAIL, Verdict.PASS, Verdict.NOT_APPLICABLE),
   "legend-when-multiple-groups": (Verdict.FAIL, Verdict.PASS, Verdict.NOT_APPLICABLE),
   "zero-baseline": (Verdict.FAIL, Verdict.PASS, Verdict.NOT_APPLICABLE),
+  "background-series-contrast": (Verdict.FAIL, Verdict.PASS),
 }
 
 

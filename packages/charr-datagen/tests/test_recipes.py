@@ -12,7 +12,7 @@ import random
 import pytest
 from charr.models import Verdict
 from charr_datagen.cells import Cell, build_cells
-from charr_datagen.colour import T_VIOLATION, delta_e2000, srgb_hex_to_lab
+from charr_datagen.colour import T_VIOLATION, T_WITHIN, delta_e2000, srgb_hex_to_lab
 from charr_datagen.configs import sample_config
 from charr_datagen.fonts import SUPPORTED_FONTS, are_distinct
 from charr_datagen.recipes import (
@@ -20,10 +20,11 @@ from charr_datagen.recipes import (
   GLOBAL_DEFECTS,
   REGISTRY,
   ChartType,
+  _drawn_colours,
   assemble,
   capable_types,
 )
-from charr_datagen.scenes import DataLabels
+from charr_datagen.scenes import ChartScene, DataLabels
 
 _CELLS = build_cells()
 _PAIRS: list[tuple[Cell, ChartType]] = [(cell, chart_type) for cell in _CELLS for chart_type in capable_types(cell)]
@@ -111,6 +112,42 @@ def test_no_overlapping_rule_is_a_symmetric_data_label_contrast() -> None:
     assert pass_scene.data_labels is DataLabels.SEPARATED
   other = Cell("has-title", Verdict.PASS)
   assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.data_labels is DataLabels.NONE
+
+
+def _min_distance_to_marks(colour: str, scene: ChartScene) -> float:
+  # Smallest deltaE2000 from ``colour`` (a background or gridline) to any colour the chart plots. Delegates to
+  # recipes._drawn_colours so the test cannot drift from how the generator defines "colours used in the graph".
+  colour_lab = srgb_hex_to_lab(colour)
+  return min(delta_e2000(colour_lab, srgb_hex_to_lab(mark)) for mark in _drawn_colours(scene))
+
+
+def test_background_contrast_fail_blends_a_mark_while_pass_keeps_the_background_clear() -> None:
+  # FAIL paints the canvas within T_WITHIN of a plotted mark (not reliably distinguishable -> it blends); PASS paints it
+  # at least T_VIOLATION from every mark (clearly distinct). The (T_WITHIN, T_VIOLATION) middle is never generated, so
+  # labels stay unambiguous. Judged purely on background-vs-mark distance, irrespective of the palette. Pie has a
+  # background too, so it serves this rule (a slice blends into the canvas).
+  fail = Cell("background-series-contrast", Verdict.FAIL)
+  passing = Cell("background-series-contrast", Verdict.PASS)
+  for name in ("bar", "line", "scatter", "pie"):
+    for seed in range(10):
+      fail_scene = assemble(fail, _type_named(fail, name), _CONFIG, random.Random(seed)).scene
+      assert _min_distance_to_marks(fail_scene.background, fail_scene) <= T_WITHIN
+      pass_scene = assemble(passing, _type_named(passing, name), _CONFIG, random.Random(seed)).scene
+      assert _min_distance_to_marks(pass_scene.background, pass_scene) >= T_VIOLATION
+
+
+def test_background_contrast_leaves_the_plotted_mark_colours_untouched() -> None:
+  # The rule only repaints the canvas; the marks keep their config colours, so it never doubles as a palette-compliance
+  # fail (single-intended-issue, docs/adr/0016). The background itself is deliberately palette-independent.
+  cell = Cell("background-series-contrast", Verdict.FAIL)
+  for seed in range(10):
+    scene = assemble(cell, _type_named(cell, "bar"), _CONFIG, random.Random(seed)).scene
+    assert all(series.color in _CONFIG.palette for series in scene.series)
+
+
+def test_non_background_cells_keep_the_white_canvas() -> None:
+  other = Cell("has-title", Verdict.PASS)
+  assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.background == "#ffffff"
 
 
 def test_global_defects_cover_every_rule() -> None:

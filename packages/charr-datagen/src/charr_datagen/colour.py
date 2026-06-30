@@ -11,6 +11,11 @@ Colours are sampled by bounded-retry rejection inside a white-legible band (a mi
 gamut), keeping each candidate that is far enough from those already chosen. A density estimate shows the band holds
 far more distinct colours than any chart needs (at most 6 palette + 1 violation), so the retry cap is a loud backstop,
 never a working limit.
+
+The same deltaE2000 machinery serves the readability rules, which judge background/gridline-vs-mark contrast
+irrespective of the palette: :func:`sample_far_from` keeps a colour clear of every plotted mark (a clean pass) and
+:func:`sample_near` lands a colour within ``T_WITHIN`` of one (a blend), the two by-construction polarities of those
+rules.
 """
 
 import math
@@ -138,10 +143,60 @@ def sample_palette(
   return [hex_value for hex_value, _ in chosen]
 
 
+def sample_far_from(
+  rng: random.Random, colours: Sequence[str], *, min_distance: float = T_VIOLATION, max_tries: int = DEFAULT_MAX_TRIES
+) -> str:
+  """Sample one legible sRGB colour at least ``min_distance`` (deltaE2000) from every colour in ``colours``.
+
+  The general "keep clear of these" primitive: used both for an off-palette violation colour and for a background or
+  gridline that must stay clearly distinct from every plotted mark (the readability rules judge that perceptual
+  distance, irrespective of the palette).
+
+  :param rng: Seeded RNG owning all randomness.
+  :param colours: The colours to stay clear of, as ``#rrggbb`` strings.
+  :param min_distance: Minimum ``deltaE2000`` from every colour in ``colours``.
+  :param max_tries: Retry budget before giving up (a loud backstop, not a working limit).
+  :return: The sampled colour as ``#rrggbb``.
+  :raises DatagenError: If no colour can be placed within ``max_tries``.
+  """
+  hex_value, _ = _draw_far_from(rng, [srgb_hex_to_lab(colour) for colour in colours], min_distance, max_tries)
+  return hex_value
+
+
+def sample_near(
+  rng: random.Random, target: str, *, max_distance: float = T_WITHIN, max_tries: int = DEFAULT_MAX_TRIES
+) -> str:
+  """Sample one in-gamut sRGB colour within ``max_distance`` (deltaE2000) of ``target`` - a near-match that blends.
+
+  Used to make a background or gridline too close to a plotted mark: within ``T_WITHIN`` the two are not reliably
+  distinguishable. The result may be any in-gamut colour (it is not constrained to the palette or the legible band);
+  only its closeness to ``target`` matters. Sampled by perturbing ``target`` in CIELAB so the success rate stays high
+  (rejection from the whole gamut would rarely land in so small a ball), then verified in deltaE2000.
+
+  :param rng: Seeded RNG owning all randomness.
+  :param target: The colour to land near, as ``#rrggbb``.
+  :param max_distance: Maximum ``deltaE2000`` from ``target``.
+  :param max_tries: Retry budget before giving up (a loud backstop, not a working limit).
+  :return: The near colour as ``#rrggbb``.
+  :raises DatagenError: If no colour can be placed within ``max_tries``.
+  """
+  target_lab = srgb_hex_to_lab(target)
+  for _ in range(max_tries):
+    candidate = _perturb_in_gamut(rng, target_lab, max_distance)
+    if candidate is not None and delta_e2000(srgb_hex_to_lab(candidate), target_lab) <= max_distance:
+      return candidate
+  from charr_datagen.errors import DatagenError  # noqa: PLC0415 - lazy import avoids a colour<->generate import cycle.
+
+  msg = f"could not sample a colour within deltaE2000 <= {max_distance} of {target!r} within {max_tries} tries"
+  raise DatagenError(msg)
+
+
 def sample_off_palette(
   rng: random.Random, palette: Sequence[str], *, min_distance: float = T_VIOLATION, max_tries: int = DEFAULT_MAX_TRIES
 ) -> str:
-  """Sample one legible sRGB colour at least ``min_distance`` from every colour in ``palette`` (the violation colour).
+  """Sample one legible sRGB colour clearly outside ``palette`` (the palette-compliance violation colour).
+
+  A named use of :func:`sample_far_from`: the result is at least ``min_distance`` from every palette colour.
 
   :param rng: Seeded RNG owning all randomness.
   :param palette: The approved palette as ``#rrggbb`` strings; the result is clearly outside it.
@@ -150,8 +205,7 @@ def sample_off_palette(
   :return: The off-palette colour as ``#rrggbb``.
   :raises DatagenError: If no colour can be placed within ``max_tries``.
   """
-  hex_value, _ = _draw_far_from(rng, [srgb_hex_to_lab(colour) for colour in palette], min_distance, max_tries)
-  return hex_value
+  return sample_far_from(rng, palette, min_distance=min_distance, max_tries=max_tries)
 
 
 def _draw_far_from(rng: random.Random, labs: list[Lab], min_distance: float, max_tries: int) -> tuple[str, Lab]:
@@ -167,6 +221,19 @@ def _draw_far_from(rng: random.Random, labs: list[Lab], min_distance: float, max
     f"({len(labs)} colours already placed); the threshold or legible band is too tight"
   )
   raise DatagenError(msg)
+
+
+def _perturb_in_gamut(rng: random.Random, lab: Lab, radius: float) -> str | None:
+  """Offset ``lab`` by a random vector of CIELAB length <= ``radius`` and return the sRGB hex, or None if out of gamut.
+
+  The offset is uniform within a ball: a random direction times ``radius * u ** (1/3)``. CIELAB length is a deltaE76
+  proxy, which is an upper bound on deltaE2000 in this region, so the caller's deltaE2000 check almost always accepts.
+  """
+  dx, dy, dz = rng.gauss(0.0, 1.0), rng.gauss(0.0, 1.0), rng.gauss(0.0, 1.0)
+  norm = math.sqrt(dx * dx + dy * dy + dz * dz) or 1.0
+  scale = radius * (rng.random() ** (1.0 / 3.0)) / norm
+  lightness, a, b = lab
+  return _lab_to_srgb_hex((lightness + dx * scale, a + dy * scale, b + dz * scale))
 
 
 def _random_legible_colour(rng: random.Random) -> tuple[str, Lab]:
