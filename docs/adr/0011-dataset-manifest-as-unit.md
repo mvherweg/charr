@@ -35,8 +35,8 @@ within it is a recommended convention for self-containment, nothing more.
   reference the same image stay distinct data points.
 - Results are **reported per manifest**, each identified by a display name of the manifest's parent directory plus its
   filename stem (so a report reads `config-00/labels: ...`). Parent-plus-stem rather than the bare stem keeps datasets
-  that all use the conventional `labels.jsonl` filename distinct in the report, and the manifest's path doubles as its
-  provenance.
+  that all use the conventional `labels.jsonl` filename distinct in the report; it is a readable label, not a full path,
+  so it points at the dataset's directory without claiming to encode its complete provenance.
 - Image paths are relative to the manifest and may include subdirectories (and, by the no-enforcement rule, may point
   outside the manifest's tree).
 

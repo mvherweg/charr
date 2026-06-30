@@ -56,7 +56,7 @@ def test_runner_names_manifests_by_parent_so_same_named_files_stay_distinct(tmp_
     (tmp_path / config / "images").mkdir(parents=True)
     (tmp_path / config / "images" / "a.png").write_bytes(b"\x89PNG")
     manifest = tmp_path / config / "labels.jsonl"
-    manifest.write_text(_record("images/a.png", {"has-title": Verdict.PASS}).model_dump_json() + "\n", "ascii")
+    manifest.write_text(_record("images/a.png", {"has-title": Verdict.PASS}).model_dump_json() + "\n", "utf-8")
     [entry] = evaluate_manifest(manifest, client=client, config=Config())
     names.add(entry.manifest)
   assert names == {"config-00/labels", "config-01/labels"}
