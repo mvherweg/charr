@@ -93,6 +93,16 @@ BUILTIN_RULES: tuple[Rule, ...] = (
       "for charts with no cartesian grid (e.g. pie charts)."
     ),
   ),
+  Rule(
+    id="gridline-weight",
+    summary="Gridlines stay thinner than the plotted lines.",
+    prompt=(
+      "On a line chart, gridlines must stay visibly thinner than the plotted data lines so they recede behind the "
+      "data. Fail when the gridlines are as thick as, or thicker than, the series lines, so they compete with the "
+      "data. Pass when there are no gridlines or they are clearly thinner than the lines. Use not_applicable for "
+      "charts whose data is not drawn as lines (bar, scatter, pie), where there is no line weight to compare against."
+    ),
+  ),
 )
 
 BUILTIN_RULES_BY_ID: dict[RuleId, Rule] = {rule.id: rule for rule in BUILTIN_RULES}

@@ -103,6 +103,8 @@ day one.
   blends into the canvas.
 - **Gridline-series contrast:** gridlines stay visually distinct from the plotted series, so a gridline does not read
   as data.
+- **Gridline weight:** on line charts, gridlines stay thinner than the plotted lines, so a heavy grid does not compete
+  with the data.
 
 **Exceptions / opt-outs:** the global config is expected to make nearly everything pass as configured. For the few cases
 that should be exempt, Charr provides an **exception mechanism**: per-rule / per-chart opt-outs. (Comparable to ignoring

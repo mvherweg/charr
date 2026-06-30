@@ -130,7 +130,10 @@ def _mpl_bars(ax: Axes, scene: ChartScene) -> None:
 
 def _mpl_lines(ax: Axes, scene: ChartScene) -> None:
   for series in scene.series:
-    ax.plot(series.x, series.y, marker=scene.marker, label=series.name, color=series.color)
+    # linewidth is the data-line weight the gridline-weight rule compares the grid against.
+    ax.plot(
+      series.x, series.y, marker=scene.marker, label=series.name, color=series.color, linewidth=scene.series_width
+    )
   _mpl_axes(ax, scene)
 
 
@@ -160,8 +163,9 @@ def _mpl_axes(ax: Axes, scene: ChartScene) -> None:
     lowest = min(value for series in scene.series for value in series.y)
     ax.set_ylim(bottom=lowest * 0.85)
   if scene.grid:
-    # Colour the grid only when it is shown; passing line properties with visible=False would force the grid on.
-    ax.grid(visible=True, color=scene.gridline_color)  # gridline-series-contrast: a series colour reads as data
+    # Colour and weight the grid only when it is shown; passing line properties with visible=False would force it on.
+    # color drives gridline-series-contrast; linewidth drives gridline-weight (a heavy grid competes with the data).
+    ax.grid(visible=True, color=scene.gridline_color, linewidth=scene.gridline_width)
   else:
     ax.grid(visible=False)
   if scene.show_legend:
@@ -213,7 +217,7 @@ def _draw_plotly(scene: ChartScene, out: Path) -> None:
         y=series.y,
         mode="lines+markers",
         name=series.name,
-        line={"color": series.color},
+        line={"color": series.color, "width": scene.series_width},  # the weight gridline-weight compares the grid to
         marker={"symbol": symbol},
       )
       for series in scene.series
@@ -242,8 +246,8 @@ def _draw_plotly(scene: ChartScene, out: Path) -> None:
     width=600,
     height=400,
   )
-  figure.update_xaxes(showgrid=scene.grid, gridcolor=scene.gridline_color)
-  figure.update_yaxes(showgrid=scene.grid, gridcolor=scene.gridline_color)
+  figure.update_xaxes(showgrid=scene.grid, gridcolor=scene.gridline_color, gridwidth=scene.gridline_width)
+  figure.update_yaxes(showgrid=scene.grid, gridcolor=scene.gridline_color, gridwidth=scene.gridline_width)
   if scene.kind is ChartKind.BAR and not scene.y_baseline_zero:
     lowest = min(value for series in scene.series for value in series.y)
     highest = max(value for series in scene.series for value in series.y)
