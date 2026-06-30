@@ -8,7 +8,9 @@ from charr.checker import CheckerError, run_check
 from charr.config import Config, RuleSelection
 from charr.llm import CheckResponse
 from charr.models import Rule, RuleId, RuleVerdict, Verdict
-from charr.rules import BUILTIN_RULES, CONFIG_GATED_RULES
+from charr.rules import BUILTIN_RULES
+
+_GATED_RULES = [(rule.id, rule.na_without) for rule in BUILTIN_RULES if rule.na_without is not None]
 
 
 class _StubClient:
@@ -118,7 +120,7 @@ def test_run_check_raises_when_no_rules_are_enabled(png_file: Path) -> None:
     run_check([png_file], config, _StubClient())
 
 
-@pytest.mark.parametrize(("rule_id", "field"), CONFIG_GATED_RULES.items())
+@pytest.mark.parametrize(("rule_id", "field"), _GATED_RULES)
 def test_run_check_forces_a_config_gated_rule_to_not_applicable_when_its_field_is_empty(
   png_file: Path,
   rule_id: RuleId,

@@ -11,7 +11,7 @@ from pathlib import Path
 from charr.config import Config
 from charr.llm import LlmClient
 from charr.models import CharrError, ImageReport, Report, Rule, RuleId, RuleVerdict, Verdict
-from charr.rules import CONFIG_GATED_RULES, select_enabled_rules
+from charr.rules import select_enabled_rules
 
 
 class CheckerError(CharrError):
@@ -51,14 +51,14 @@ def run_check(images: Sequence[Path], config: Config, client: LlmClient) -> Repo
 def _split_config_gated(rules: Sequence[Rule], config: Config) -> tuple[list[Rule], list[RuleVerdict]]:
   """Partition ``rules`` into those to send to the model and deterministic ``not_applicable`` verdicts.
 
-  A rule in :data:`~charr.rules.CONFIG_GATED_RULES` whose backing config field is empty cannot be judged - there is no
-  palette or font to compare against - so it resolves to ``not_applicable`` here and is never sent. This makes the
-  outcome a hard guarantee (not a request the LLM might ignore) and trims the rule from the vision call (issue #14).
+  A rule whose :attr:`~charr.models.Rule.na_without` config field is empty cannot be judged - there is no palette or
+  font to compare against - so it resolves to ``not_applicable`` here and is never sent. This makes the outcome a hard
+  guarantee (not a request the LLM might ignore) and trims the rule from the vision call (issue #14).
   """
   to_send: list[Rule] = []
   gated_na: list[RuleVerdict] = []
   for rule in rules:
-    field = CONFIG_GATED_RULES.get(rule.id)
+    field = rule.na_without
     if field is not None and not getattr(config, field):
       rationale = f"No {field} is configured, so this rule is not applicable."
       gated_na.append(RuleVerdict(rule_id=rule.id, verdict=Verdict.NOT_APPLICABLE, rationale=rationale))

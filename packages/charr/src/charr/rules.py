@@ -37,6 +37,7 @@ BUILTIN_RULES: tuple[Rule, ...] = (
       "The chart's colors must come from the allowed palette: {palette}. Fail if clearly off-palette colors are used. "
       "Use not_applicable when no palette is configured or the chart is effectively monochrome."
     ),
+    na_without="palette",
   ),
   Rule(
     id="font-compliance",
@@ -45,6 +46,7 @@ BUILTIN_RULES: tuple[Rule, ...] = (
       "The chart's text must use the expected font(s): {fonts}. Fail if the typeface clearly differs. Use "
       "not_applicable when no fonts are configured or the font cannot be judged from the image."
     ),
+    na_without="fonts",
   ),
   Rule(
     id="axis-units",
@@ -75,16 +77,6 @@ BUILTIN_RULES: tuple[Rule, ...] = (
 )
 
 BUILTIN_RULES_BY_ID: dict[RuleId, Rule] = {rule.id: rule for rule in BUILTIN_RULES}
-
-# Rules that only mean something when a matching expectation is configured. Each maps to the ``Config`` field whose
-# emptiness makes the rule not applicable: with no palette there is nothing for palette-compliance to judge against, and
-# likewise for fonts. The checker resolves these to a deterministic ``not_applicable`` and drops them from the model
-# request rather than asking the prompt to elicit it (issue #14), so the outcome is guaranteed and offline-testable
-# instead of hinging on the LLM.
-CONFIG_GATED_RULES: dict[RuleId, str] = {
-  "palette-compliance": "palette",
-  "font-compliance": "fonts",
-}
 
 
 def select_enabled_rules(enable: list[RuleId], disable: list[RuleId]) -> list[Rule]:
