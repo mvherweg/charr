@@ -60,7 +60,7 @@ def _split_config_gated(rules: Sequence[Rule], config: Config) -> tuple[list[Rul
   for rule in rules:
     field = rule.na_without
     if field is not None and not getattr(config, field):
-      rationale = f"No {field} is configured, so this rule is not applicable."
+      rationale = f"The {field} expectation is not configured, so this rule is not applicable."
       gated_na.append(RuleVerdict(rule_id=rule.id, verdict=Verdict.NOT_APPLICABLE, rationale=rationale))
     else:
       to_send.append(rule)
