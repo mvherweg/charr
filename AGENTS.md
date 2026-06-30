@@ -25,7 +25,9 @@ Run these locally when practical; CI runs the full set on every PR:
 
 ## Code style
 
-- **ASCII only** in all markdown and code. No em-dashes, emoji, smart quotes, or non-ASCII symbols (write `<=`, `->`).
+- **ASCII only** in source and docs we author: no emoji, em-dashes/en-dashes (use `-`), smart quotes, or Unicode
+  arrows/math symbols (write `<=`, `->`). This is about text we type, not a runtime constraint: data files (model
+  rationales, manifests, the eval substrate) use `encoding="utf-8"` and pass non-ASCII through.
 - Line length **120** for code (Ruff-enforced). For markdown prose it is a soft, by-hand target (`wrap = "keep"` means
   mdformat does not auto-wrap): a little over is fine; tables and links may exceed. **2-space indent** (not 4).
 - Full type hints, new-style (`X | None`, never `Optional`).

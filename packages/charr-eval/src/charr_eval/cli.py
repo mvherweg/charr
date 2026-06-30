@@ -113,7 +113,7 @@ def _config_for(manifest: Path, config_path: Path | None) -> Config:
 
 
 def _persist_substrate(path: Path, records: Sequence[SubstrateRecord]) -> None:
-  with path.open("w", encoding="ascii") as handle:
+  with path.open("w", encoding="utf-8") as handle:
     for record in records:
       handle.write(record.model_dump_json())
       handle.write("\n")
