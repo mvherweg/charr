@@ -20,13 +20,18 @@ from charr_eval.scoring import SubstrateRecord
 def evaluate_manifest(manifest_path: Path, *, client: LlmClient, config: Config) -> list[SubstrateRecord]:
   """Run the checker over every image in ``manifest_path`` and return the per-rule substrate records.
 
-  :param manifest_path: The manifest to evaluate; its filename stem names the manifest in the results.
+  :param manifest_path: The manifest to evaluate; its parent directory and filename stem name the manifest in the
+    results (e.g. ``config-00/labels``), so datasets that all use the conventional ``labels.jsonl`` filename stay
+    distinct in the per-manifest report.
   :param client: The LLM client the checker drives (a real backend in the CLI; a fake in tests).
   :param config: The checker configuration to evaluate under (typically discovered next to the manifest).
   :return: One :class:`SubstrateRecord` per ``(image, rule)`` in the manifest.
   :raises ValueError: If the manifest itself is malformed (a dataset error, not a checker error).
   """
-  manifest_name = manifest_path.stem
+  # Name the manifest by parent dir + stem, not the bare stem: generated datasets all use the same labels.jsonl
+  # filename, so the stem alone collides and merges distinct configs into one per-manifest section.
+  parent = manifest_path.parent.name
+  manifest_name = f"{parent}/{manifest_path.stem}" if parent else manifest_path.stem
   records: list[SubstrateRecord] = []
   for record in read_manifest(manifest_path):
     predicted, error = _check_one(resolve_image(manifest_path, record), config=config, client=client)

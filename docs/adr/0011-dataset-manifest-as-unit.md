@@ -33,9 +33,10 @@ within it is a recommended convention for self-containment, nothing more.
 
 - A **test set** is one or more manifests, unioned. Records are keyed by `(manifest, image-path)`, so two manifests that
   reference the same image stay distinct data points.
-- Results are **reported per manifest**, each identified by a display name defaulting to the manifest's filename stem
-  (so a report reads `production-q2: ...`). This is the per-grouping reported dimension the forces call for, and the
-  manifest's path doubles as its provenance.
+- Results are **reported per manifest**, each identified by a display name of the manifest's parent directory plus its
+  filename stem (so a report reads `config-00/labels: ...`). Parent-plus-stem rather than the bare stem keeps datasets
+  that all use the conventional `labels.jsonl` filename distinct in the report, and the manifest's path doubles as its
+  provenance.
 - Image paths are relative to the manifest and may include subdirectories (and, by the no-enforcement rule, may point
   outside the manifest's tree).
 

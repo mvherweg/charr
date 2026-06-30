@@ -44,8 +44,22 @@ def test_runner_records_one_substrate_entry_per_image_and_rule(
   by_rule = {entry.rule_id: entry for entry in substrate}
   assert by_rule["has-title"].truth is Verdict.FAIL
   assert by_rule["has-title"].predicted is Verdict.FAIL
-  assert by_rule["has-title"].manifest == "labels"
+  assert by_rule["has-title"].manifest == f"{manifest.parent.name}/labels"
   assert by_rule["has-title"].error is None
+
+
+def test_runner_names_manifests_by_parent_so_same_named_files_stay_distinct(tmp_path: Path) -> None:
+  # Generated datasets all use the labels.jsonl filename; the parent dir is what tells config-00 from config-01.
+  client = _FakeClient({})
+  names: set[str] = set()
+  for config in ("config-00", "config-01"):
+    (tmp_path / config / "images").mkdir(parents=True)
+    (tmp_path / config / "images" / "a.png").write_bytes(b"\x89PNG")
+    manifest = tmp_path / config / "labels.jsonl"
+    manifest.write_text(_record("images/a.png", {"has-title": Verdict.PASS}).model_dump_json() + "\n", "ascii")
+    [entry] = evaluate_manifest(manifest, client=client, config=Config())
+    names.add(entry.manifest)
+  assert names == {"config-00/labels", "config-01/labels"}
 
 
 def test_runner_captures_disagreement(make_dataset: Callable[[Sequence[ManifestRecord]], Path]) -> None:
