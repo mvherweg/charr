@@ -1,6 +1,7 @@
 """Tests for the built-in rule catalog and selection logic."""
 
 import pytest
+from charr.config import Config
 from charr.rules import BUILTIN_RULES, BUILTIN_RULES_BY_ID, select_enabled_rules
 
 
@@ -9,6 +10,14 @@ def test_every_builtin_rule_has_a_unique_kebab_case_id() -> None:
   assert len(ids) == len(set(ids))
   assert set(ids) == set(BUILTIN_RULES_BY_ID)
   assert all(rule_id == rule_id.lower() and " " not in rule_id for rule_id in ids)
+
+
+def test_na_without_names_a_real_config_field() -> None:
+  # The config-gatedness is declared per rule as a Config field name; this pins it to an actual field so a typo (or a
+  # renamed Config field) fails loudly instead of silently making the rule un-gateable.
+  gated = [rule.na_without for rule in BUILTIN_RULES if rule.na_without is not None]
+  assert gated, "expected at least one config-gated rule (palette/font compliance)"
+  assert all(field in Config.model_fields for field in gated)
 
 
 def test_select_enabled_rules_returns_all_defaults_when_there_are_no_overrides() -> None:

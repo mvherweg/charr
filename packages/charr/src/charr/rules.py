@@ -37,6 +37,7 @@ BUILTIN_RULES: tuple[Rule, ...] = (
       "The chart's colors must come from the allowed palette: {palette}. Fail if clearly off-palette colors are used. "
       "Use not_applicable when no palette is configured or the chart is effectively monochrome."
     ),
+    na_without="palette",
   ),
   Rule(
     id="font-compliance",
@@ -45,6 +46,7 @@ BUILTIN_RULES: tuple[Rule, ...] = (
       "The chart's text must use the expected font(s): {fonts}. Fail if the typeface clearly differs. Use "
       "not_applicable when no fonts are configured or the font cannot be judged from the image."
     ),
+    na_without="fonts",
   ),
   Rule(
     id="axis-units",

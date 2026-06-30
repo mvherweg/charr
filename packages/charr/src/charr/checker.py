@@ -10,7 +10,7 @@ from pathlib import Path
 
 from charr.config import Config
 from charr.llm import LlmClient
-from charr.models import CharrError, ImageReport, Report, RuleId, RuleVerdict
+from charr.models import CharrError, ImageReport, Report, Rule, RuleId, RuleVerdict, Verdict
 from charr.rules import select_enabled_rules
 
 
@@ -36,12 +36,35 @@ def run_check(images: Sequence[Path], config: Config, client: LlmClient) -> Repo
     msg = "no rules are enabled; nothing to check"
     raise CheckerError(msg)
   requested = [rule.id for rule in rules]
+  to_send, gated_na = _split_config_gated(rules, config)
+  sent = [rule.id for rule in to_send]
   reports: list[ImageReport] = []
   for image in images:
-    response = client.check_image(image=image, rules=rules, config=config)
-    verdicts = _reconcile(image, requested, response.results)
-    reports.append(ImageReport(image=str(image), verdicts=verdicts))
+    by_id = {verdict.rule_id: verdict for verdict in gated_na}
+    if to_send:
+      response = client.check_image(image=image, rules=to_send, config=config)
+      by_id.update({verdict.rule_id: verdict for verdict in _reconcile(image, sent, response.results)})
+    reports.append(ImageReport(image=str(image), verdicts=[by_id[rule_id] for rule_id in requested]))
   return Report(images=reports)
+
+
+def _split_config_gated(rules: Sequence[Rule], config: Config) -> tuple[list[Rule], list[RuleVerdict]]:
+  """Partition ``rules`` into those to send to the model and deterministic ``not_applicable`` verdicts.
+
+  A rule whose :attr:`~charr.models.Rule.na_without` config field is empty cannot be judged - there is no palette or
+  font to compare against - so it resolves to ``not_applicable`` here and is never sent. This makes the outcome a hard
+  guarantee (not a request the LLM might ignore) and trims the rule from the vision call (issue #14).
+  """
+  to_send: list[Rule] = []
+  gated_na: list[RuleVerdict] = []
+  for rule in rules:
+    field = rule.na_without
+    if field is not None and not getattr(config, field):
+      rationale = f"The {field} expectation is not configured, so this rule is not applicable."
+      gated_na.append(RuleVerdict(rule_id=rule.id, verdict=Verdict.NOT_APPLICABLE, rationale=rationale))
+    else:
+      to_send.append(rule)
+  return to_send, gated_na
 
 
 def _reconcile(image: Path, requested: Sequence[RuleId], verdicts: Sequence[RuleVerdict]) -> list[RuleVerdict]:

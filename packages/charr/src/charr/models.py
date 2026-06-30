@@ -45,12 +45,17 @@ class Rule(BaseModel):
 
   ``prompt`` is the load-bearing text handed to the model; ``summary`` is a short human label. ``prompt`` may contain
   ``{palette}`` / ``{fonts}`` placeholders that are filled from config when the request is built.
+
+  ``na_without`` names the ``Config`` field (e.g. ``palette``) whose emptiness makes this rule deterministically
+  ``not_applicable``: with nothing configured there is nothing to judge against, so the checker resolves the verdict
+  itself and never sends the rule to the model. ``None`` (the default) means the rule always applies.
   """
 
   id: RuleId
   summary: str
   prompt: str
   enabled_by_default: bool = True
+  na_without: str | None = None
 
 
 class RuleVerdict(BaseModel):
