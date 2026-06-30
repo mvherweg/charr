@@ -83,6 +83,16 @@ BUILTIN_RULES: tuple[Rule, ...] = (
       "the data marks (bars, lines, points, pie slices) against the background, not the axes or gridlines."
     ),
   ),
+  Rule(
+    id="gridline-series-contrast",
+    summary="Gridlines stay distinct from the series colors.",
+    prompt=(
+      "Gridlines, when present, must stay visually distinct from the plotted data series; a gridline sharing a "
+      "series' color reads as data. Fail when a gridline color matches or is very close to a plotted series color. "
+      "Pass when there are no gridlines or every gridline is clearly distinct from the series. Use not_applicable only "
+      "for charts with no cartesian grid (e.g. pie charts)."
+    ),
+  ),
 )
 
 BUILTIN_RULES_BY_ID: dict[RuleId, Rule] = {rule.id: rule for rule in BUILTIN_RULES}

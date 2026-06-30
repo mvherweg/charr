@@ -51,8 +51,9 @@ class ChartScene:
   ``None`` for ``title`` / ``x_label`` / ``y_label`` means the element is deliberately absent (the by-construction way
   a labelling rule is made to fail). ``data_labels`` drives the no-overlapping-elements rule (see :class:`DataLabels`).
   ``background`` is the plot canvas colour and drives the background-series-contrast rule: the dataset norm is white,
-  a violation sets it near a plotted colour (within ``T_WITHIN``, so that element blends in). ``grid`` and ``marker``
-  are cosmetic, label-neutral jitter.
+  a violation sets it near a plotted colour (within ``T_WITHIN``, so that element blends in). ``gridline_color`` is the
+  grid colour (the dataset norm is a neutral grey) and drives the gridline-series-contrast rule, set near a series'
+  colour to make the gridlines read as data. ``grid`` and ``marker`` are cosmetic, label-neutral jitter.
   """
 
   kind: ChartKind
@@ -65,6 +66,7 @@ class ChartScene:
   y_baseline_zero: bool = True
   data_labels: DataLabels = DataLabels.NONE
   background: str = "#ffffff"
+  gridline_color: str = "#b0b0b0"
   grid: bool = True
   marker: str = "o"
   palette: list[str] = field(default_factory=list)
