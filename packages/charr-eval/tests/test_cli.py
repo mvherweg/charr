@@ -19,6 +19,15 @@ class _PassClient:
     return CheckResponse(results=[RuleVerdict(rule_id=r.id, verdict=Verdict.PASS, rationale="ok") for r in rules])
 
 
+class _NonAsciiRationaleClient:
+  """A backend whose rationale carries a non-ASCII character, exercising UTF-8 substrate persistence."""
+
+  def check_image(self, *, image: Path, rules: Sequence[Rule], config: Config) -> CheckResponse:  # noqa: ARG002
+    # chr(0x2019) is U+2019 RIGHT SINGLE QUOTATION MARK: the kind of non-ASCII a real model emits in prose.
+    rationale = f"the title isn{chr(0x2019)}t centred"
+    return CheckResponse(results=[RuleVerdict(rule_id=r.id, verdict=Verdict.PASS, rationale=rationale) for r in rules])
+
+
 def _set_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
   monkeypatch.setenv("CHARR_LLM_BASE_URL", "http://localhost:1234/v1")
   monkeypatch.setenv("CHARR_LLM_MODEL", "fake-model")
@@ -41,6 +50,22 @@ def test_main_scores_a_manifest_end_to_end_with_a_fake_backend(
   assert "== overall ==" in capsys.readouterr().out
   assert substrate_out.is_file()
   assert substrate_out.read_text(encoding="ascii").strip()
+
+
+def test_main_persists_a_non_ascii_rationale_as_utf8(
+  monkeypatch: pytest.MonkeyPatch,
+  make_dataset: Callable[[Sequence[ManifestRecord]], Path],
+  tmp_path: Path,
+) -> None:
+  _set_credentials(monkeypatch)
+  monkeypatch.setattr(cli, "OpenAiCompatClient", lambda *args, **kwargs: _NonAsciiRationaleClient())  # noqa: ARG005
+  manifest = make_dataset(
+    [ManifestRecord(image="images/a.png", library="matplotlib", labels={"has-title": Verdict.PASS})]
+  )
+  substrate_out = tmp_path / "substrate.jsonl"
+  exit_code = cli.main([str(manifest), "--substrate-out", str(substrate_out)])
+  assert exit_code == cli.EXIT_OK
+  assert chr(0x2019) in substrate_out.read_text(encoding="utf-8")
 
 
 def test_main_returns_cannot_run_without_credentials(

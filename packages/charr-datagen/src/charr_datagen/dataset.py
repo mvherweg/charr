@@ -35,7 +35,7 @@ def write_manifest(path: Path, records: Iterable[ManifestRecord]) -> None:
   :param path: Destination manifest file; its parent directory must already exist.
   :param records: The image records to serialize, in the order to write them.
   """
-  with path.open("w", encoding="ascii") as handle:
+  with path.open("w", encoding="utf-8") as handle:
     for record in records:
       handle.write(record.model_dump_json())
       handle.write("\n")
