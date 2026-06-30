@@ -138,8 +138,6 @@ function renderMeta(row) {
     ["correct", row.correct ? "yes" : "no"],
     ["rationale", row.rationale || ""],
     ["error", row.error || ""],
-    ["library", row.library || ""],
-    ["polarity", row.polarity || ""],
     ["manifest", row.manifest],
     ["image", row.image],
   ];

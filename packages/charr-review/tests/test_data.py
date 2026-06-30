@@ -49,18 +49,17 @@ def test_load_rows_builds_one_row_per_record_with_resolved_fields(make_review: M
   assert [row.rule_id for row in data.rows] == ["has-title", "axes-labeled"]
   assert data.rows[0].outcome is Outcome.TP
   assert data.rows[0].rationale == "no title found"
-  assert data.rows[0].library == "matplotlib"
-  assert data.rows[0].polarity == "fail"
   assert data.summary["total"] == 2
   assert data.summary["TP"] == 1
   assert data.warnings == []
 
 
-def test_parse_filename_yields_none_for_a_hand_authored_name(make_review: MakeReview) -> None:
+def test_load_rows_handles_a_hand_authored_image_name(make_review: MakeReview) -> None:
+  # No assumption about the filename shape: an arbitrary name still resolves and reviews fine.
   substrate, dataset = make_review([_record("has-title", FAIL, FAIL, image="images/chart.png")])
   row = load_rows(substrate, dataset).rows[0]
-  assert row.library is None
-  assert row.polarity is None
+  assert row.image == "images/chart.png"
+  assert row.outcome is Outcome.TP
 
 
 def test_load_rows_raises_charr_error_on_a_malformed_line(make_review: MakeReview) -> None:

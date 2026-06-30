@@ -8,7 +8,7 @@ defines ``fail`` as the positive class and folds the error bucket in as a non-de
 
 from collections import Counter
 from enum import StrEnum
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from charr.models import IMAGE_SUFFIXES, CharrError, RuleId, Verdict
 from pydantic import BaseModel, ValidationError
@@ -53,8 +53,6 @@ class ReviewRow(BaseModel):
   rationale: str | None
   error: str | None
   image: str
-  library: str | None
-  polarity: str | None
 
 
 class ReviewData(BaseModel):
@@ -76,7 +74,6 @@ def load_rows(substrate_path: Path, dataset_dir: Path) -> ReviewData:
   records = _read_substrate(substrate_path)
   rows: list[ReviewRow] = []
   for index, record in enumerate(records):
-    library, polarity = _parse_filename(record.image)
     rows.append(
       ReviewRow(
         index=index,
@@ -89,8 +86,6 @@ def load_rows(substrate_path: Path, dataset_dir: Path) -> ReviewData:
         rationale=record.raw,
         error=record.error,
         image=record.image,
-        library=library,
-        polarity=polarity,
       ),
     )
   return ReviewData(rows=rows, summary=_summarize(rows), warnings=_detect_warnings(records, rows, dataset_dir))
@@ -147,19 +142,6 @@ def _read_substrate(path: Path) -> list[SubstrateRecord]:
     msg = f"no records in substrate: {path}"
     raise CharrError(msg)
   return records
-
-
-def _parse_filename(image: str) -> tuple[str | None, str | None]:
-  """Best-effort ``(library, polarity)`` from a generated name ``NNNN-<rule>-<polarity>-<library>.png``.
-
-  The rule id may contain hyphens, so parse positionally from the right; return ``(None, None)`` for any name that does
-  not fit (e.g. a hand-authored dataset).
-  """
-  parts = PurePosixPath(image).stem.split("-")
-  expected_min_parts = 4  # index, >=1 rule part, polarity, library
-  if len(parts) < expected_min_parts or not parts[0].isdigit():
-    return None, None
-  return parts[-1], parts[-2]
 
 
 def _summarize(rows: list[ReviewRow]) -> dict[str, int]:
