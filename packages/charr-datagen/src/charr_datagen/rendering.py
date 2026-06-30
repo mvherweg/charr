@@ -159,7 +159,11 @@ def _mpl_axes(ax: Axes, scene: ChartScene) -> None:
   else:
     lowest = min(value for series in scene.series for value in series.y)
     ax.set_ylim(bottom=lowest * 0.85)
-  ax.grid(visible=scene.grid)
+  if scene.grid:
+    # Colour the grid only when it is shown; passing line properties with visible=False would force the grid on.
+    ax.grid(visible=True, color=scene.gridline_color)  # gridline-series-contrast: a series colour reads as data
+  else:
+    ax.grid(visible=False)
   if scene.show_legend:
     ax.legend()
 
@@ -238,8 +242,8 @@ def _draw_plotly(scene: ChartScene, out: Path) -> None:
     width=600,
     height=400,
   )
-  figure.update_xaxes(showgrid=scene.grid)
-  figure.update_yaxes(showgrid=scene.grid)
+  figure.update_xaxes(showgrid=scene.grid, gridcolor=scene.gridline_color)
+  figure.update_yaxes(showgrid=scene.grid, gridcolor=scene.gridline_color)
   if scene.kind is ChartKind.BAR and not scene.y_baseline_zero:
     lowest = min(value for series in scene.series for value in series.y)
     highest = max(value for series in scene.series for value in series.y)

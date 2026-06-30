@@ -150,6 +150,34 @@ def test_non_background_cells_keep_the_white_canvas() -> None:
   assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.background == "#ffffff"
 
 
+def test_gridline_contrast_blends_a_series_on_fail_and_stays_clear_and_visible_on_pass() -> None:
+  # FAIL colours the grid within T_WITHIN of a series (reads as data); PASS keeps it at least T_VIOLATION from every
+  # series. Both force the grid on so the rule is judgeable, and both carry a coloured grid - so a coloured grid is not
+  # the cue, only whether it lands near a series is. Pie has no cartesian grid, so it is NA and never serves fail/pass.
+  fail = Cell("gridline-series-contrast", Verdict.FAIL)
+  passing = Cell("gridline-series-contrast", Verdict.PASS)
+  for name in ("bar", "line", "scatter"):
+    for seed in range(10):
+      fail_scene = assemble(fail, _type_named(fail, name), _CONFIG, random.Random(seed)).scene
+      assert fail_scene.grid is True
+      assert _min_distance_to_marks(fail_scene.gridline_color, fail_scene) <= T_WITHIN
+      pass_scene = assemble(passing, _type_named(passing, name), _CONFIG, random.Random(seed)).scene
+      assert pass_scene.grid is True
+      assert _min_distance_to_marks(pass_scene.gridline_color, pass_scene) >= T_VIOLATION
+
+
+def test_gridline_contrast_is_not_applicable_for_pie() -> None:
+  # A pie has no cartesian grid, so the rule is NA for it - the NA cell is served only by pie (like zero-baseline).
+  na = Cell("gridline-series-contrast", Verdict.NOT_APPLICABLE)
+  assert [chart_type.name for chart_type in capable_types(na)] == ["pie"]
+  assert assemble(na, _type_named(na, "pie"), _CONFIG, random.Random(1)).labels[na.rule_id] is Verdict.NOT_APPLICABLE
+
+
+def test_non_gridline_cells_keep_the_neutral_grey_grid() -> None:
+  other = Cell("has-title", Verdict.PASS)
+  assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.gridline_color == "#b0b0b0"
+
+
 def test_global_defects_cover_every_rule() -> None:
   assert set(GLOBAL_DEFECTS) == set(ALL_RULES)
 

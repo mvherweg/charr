@@ -37,6 +37,7 @@ ALL_RULES: tuple[RuleId, ...] = tuple(rule.id for rule in BUILTIN_RULES)
 _LEGEND = "legend-when-multiple-groups"
 _OVERLAP = "no-overlapping-elements"
 _BACKGROUND = "background-series-contrast"
+_GRIDLINE = "gridline-series-contrast"
 
 _TIME_LABELS: tuple[str, ...] = ("Month", "Quarter", "Week", "Year", "Period")
 _SAMPLE_LABELS: tuple[str, ...] = ("Sample", "Observation", "Trial", "Specimen", "Measurement")
@@ -232,6 +233,15 @@ def _low_background_contrast(scene: ChartScene, _config: StyleConfig, rng: rando
   scene.background = sample_near(rng, rng.choice(_drawn_colours(scene)))
 
 
+def _low_gridline_contrast(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
+  # Show the grid and colour it within T_WITHIN (deltaE2000) of one plotted series, so the gridlines are not reliably
+  # distinguishable from that series and read as data. Like the background, this is judged irrespective of the palette.
+  # The compliant exemplar (_distinct_gridlines) keeps the grid far from every series, so a coloured grid is not the cue
+  # - only whether it lands near a series is.
+  scene.grid = True
+  scene.gridline_color = sample_near(rng, rng.choice(_drawn_colours(scene)))
+
+
 # --- compliant exemplars: positive features a rule's PASS side must *show* so its FAIL is a layout contrast, not a
 # presence cue. Only no-overlapping needs one: its FAIL crowds the value labels (above), so its PASS must draw the same
 # labels cleanly separated. Every other rule's baseline is already a clean pass, so the table holds just this entry.
@@ -248,12 +258,24 @@ def _distinct_background(scene: ChartScene, _config: StyleConfig, rng: random.Ra
   scene.background = sample_far_from(rng, _drawn_colours(scene))
 
 
+def _distinct_gridlines(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
+  # Show the grid in a colour at least T_VIOLATION (deltaE2000) from every plotted series, so it stays clearly
+  # subordinate to the data. Both polarities force the grid on and carry a coloured grid, so a coloured grid is not the
+  # cue; only whether it lands near a series is.
+  scene.grid = True
+  scene.gridline_color = sample_far_from(rng, _drawn_colours(scene))
+
+
 def _drawn_colours(scene: ChartScene) -> list[str]:
   # Every data colour the chart actually plots: the series colours plus, for a pie, its per-slice palette.
   return [series.color for series in scene.series] + list(scene.palette)
 
 
-COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels, _BACKGROUND: _distinct_background}
+COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {
+  _OVERLAP: _separate_labels,
+  _BACKGROUND: _distinct_background,
+  _GRIDLINE: _distinct_gridlines,
+}
 
 
 GLOBAL_DEFECTS: dict[RuleId, Injector] = {
@@ -266,6 +288,7 @@ GLOBAL_DEFECTS: dict[RuleId, Injector] = {
   _LEGEND: _remove_legend,
   "zero-baseline": _nonzero_baseline,
   _BACKGROUND: _low_background_contrast,
+  _GRIDLINE: _low_gridline_contrast,
 }
 
 
@@ -367,7 +390,7 @@ REGISTRY: tuple[ChartType, ...] = (
     name="pie",
     kind=ChartKind.PIE,
     baseline=_pie_baseline,
-    na_rules=frozenset({"axes-labeled", "axis-units", "zero-baseline"}),
+    na_rules=frozenset({"axes-labeled", "axis-units", "zero-baseline", _GRIDLINE}),
     supports_single_group=False,
   ),
 )
