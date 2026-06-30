@@ -20,6 +20,7 @@ from charr_datagen.recipes import (
   GLOBAL_DEFECTS,
   REGISTRY,
   ChartType,
+  _drawn_colours,
   assemble,
   capable_types,
 )
@@ -113,14 +114,11 @@ def test_no_overlapping_rule_is_a_symmetric_data_label_contrast() -> None:
   assert assemble(other, _type_named(other, "bar"), _CONFIG, random.Random(1)).scene.data_labels is DataLabels.NONE
 
 
-def _drawn_colours(scene: ChartScene) -> list[str]:
-  # The data colours a chart plots: series colours plus, for a pie, its per-slice palette (as recipes._drawn_colours).
-  return [series.color for series in scene.series] + list(scene.palette)
-
-
-def _min_distance_to_marks(background: str, scene: ChartScene) -> float:
-  background_lab = srgb_hex_to_lab(background)
-  return min(delta_e2000(background_lab, srgb_hex_to_lab(colour)) for colour in _drawn_colours(scene))
+def _min_distance_to_marks(colour: str, scene: ChartScene) -> float:
+  # Smallest deltaE2000 from ``colour`` (a background or gridline) to any colour the chart plots. Delegates to
+  # recipes._drawn_colours so the test cannot drift from how the generator defines "colours used in the graph".
+  colour_lab = srgb_hex_to_lab(colour)
+  return min(delta_e2000(colour_lab, srgb_hex_to_lab(mark)) for mark in _drawn_colours(scene))
 
 
 def test_background_contrast_fail_blends_a_mark_while_pass_keeps_the_background_clear() -> None:
