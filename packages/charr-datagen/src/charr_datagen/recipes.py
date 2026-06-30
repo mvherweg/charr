@@ -26,7 +26,7 @@ from charr.models import RuleId, Verdict
 from charr.rules import BUILTIN_RULES
 
 from charr_datagen.cells import Cell
-from charr_datagen.colour import delta_e2000, sample_off_palette, srgb_hex_to_lab
+from charr_datagen.colour import sample_far_from, sample_near, sample_off_palette
 from charr_datagen.configs import StyleConfig
 from charr_datagen.domains import DOMAINS, Domain
 from charr_datagen.fonts import sample_violation
@@ -224,12 +224,12 @@ def _nonzero_baseline(scene: ChartScene, _config: StyleConfig, _rng: random.Rand
 
 
 def _low_background_contrast(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
-  # Paint the canvas the exact colour of one drawn data colour - a series, or a pie slice - so that element blends into
-  # the background (deltaE2000 = 0, a guaranteed low-contrast fail). The colour is one the chart already draws, so it
-  # stays in-palette and never doubles as a palette-compliance fail; the rest stay distinct (palette colours are
-  # >= T_WITHIN apart). The compliant exemplar (_distinct_background) paints a colour far from every drawn colour, so a
-  # tinted canvas is not the cue - only whether it matches a plotted colour is.
-  scene.background = rng.choice(_drawn_colours(scene))
+  # Paint the canvas a colour within T_WITHIN (deltaE2000) of one plotted mark, so that mark is not reliably
+  # distinguishable from the background and blends in. The rule judges background-vs-marks irrespective of the palette,
+  # so the background may be any colour (off-palette is fine, exactly as the white/grey/black chrome already is). The
+  # compliant exemplar (_distinct_background) keeps the canvas far from every mark, so a tinted canvas is not the cue -
+  # only whether it lands near a mark is.
+  scene.background = sample_near(rng, rng.choice(_drawn_colours(scene)))
 
 
 # --- compliant exemplars: positive features a rule's PASS side must *show* so its FAIL is a layout contrast, not a
@@ -241,35 +241,16 @@ def _separate_labels(scene: ChartScene, _config: StyleConfig, _rng: random.Rando
   scene.data_labels = DataLabels.SEPARATED
 
 
-def _distinct_background(scene: ChartScene, config: StyleConfig, _rng: random.Random) -> None:
-  # Show a deliberately high-contrast non-white background so the FAIL is "background matches a plotted colour", not
-  # merely "background is tinted". Use the in-palette colour farthest from every drawn colour; fall back to the white
-  # norm only when the chart already uses the whole palette (still high-contrast against the legible-band data).
-  distinct = _farthest_unused_palette_colour(scene, config)
-  if distinct is not None:
-    scene.background = distinct
+def _distinct_background(scene: ChartScene, _config: StyleConfig, rng: random.Random) -> None:
+  # Paint the canvas a colour at least T_VIOLATION (deltaE2000) from every plotted mark, so nothing blends - a clean,
+  # unambiguous pass. Both polarities carry a sampled (non-white) background, so a tinted canvas is not the cue; only
+  # whether it lands near a mark is.
+  scene.background = sample_far_from(rng, _drawn_colours(scene))
 
 
 def _drawn_colours(scene: ChartScene) -> list[str]:
   # Every data colour the chart actually plots: the series colours plus, for a pie, its per-slice palette.
   return [series.color for series in scene.series] + list(scene.palette)
-
-
-def _farthest_unused_palette_colour(scene: ChartScene, config: StyleConfig) -> str | None:
-  # The palette colour the chart does not plot that sits farthest (max of the min deltaE2000 to any drawn colour) from
-  # every plotted colour, or None when the chart already uses the whole palette. In-palette by construction, so it can
-  # never read as a palette violation; the max-min choice gives the clearest available contrast (avoids a near miss).
-  drawn = set(_drawn_colours(scene))
-  drawn_labs = [srgb_hex_to_lab(colour) for colour in drawn]
-  unused = [colour for colour in config.palette if colour not in drawn]
-  if not unused:
-    return None
-
-  def _clearance(colour: str) -> float:
-    lab = srgb_hex_to_lab(colour)  # convert once per candidate, not once per (candidate, drawn) pair
-    return min(delta_e2000(lab, other) for other in drawn_labs)
-
-  return max(unused, key=_clearance)
 
 
 COMPLIANT_EXEMPLARS: dict[RuleId, Injector] = {_OVERLAP: _separate_labels, _BACKGROUND: _distinct_background}

@@ -118,25 +118,29 @@ def _drawn_colours(scene: ChartScene) -> list[str]:
   return [series.color for series in scene.series] + list(scene.palette)
 
 
-def test_background_contrast_fail_blends_a_plotted_colour_while_pass_keeps_the_background_distinct() -> None:
-  # FAIL paints the canvas the exact colour of a plotted data colour (it blends in); PASS paints it a colour clearly
-  # separated from every plotted colour. Both sides carry a (possibly tinted) background, so a tinted canvas is not the
-  # cue - only whether it matches a plotted colour is. Pie has a background too, so it serves this rule (a slice is
-  # drawn into the canvas).
+def _min_distance_to_marks(background: str, scene: ChartScene) -> float:
+  background_lab = srgb_hex_to_lab(background)
+  return min(delta_e2000(background_lab, srgb_hex_to_lab(colour)) for colour in _drawn_colours(scene))
+
+
+def test_background_contrast_fail_blends_a_mark_while_pass_keeps_the_background_clear() -> None:
+  # FAIL paints the canvas within T_WITHIN of a plotted mark (not reliably distinguishable -> it blends); PASS paints it
+  # at least T_VIOLATION from every mark (clearly distinct). The (T_WITHIN, T_VIOLATION) middle is never generated, so
+  # labels stay unambiguous. Judged purely on background-vs-mark distance, irrespective of the palette. Pie has a
+  # background too, so it serves this rule (a slice blends into the canvas).
   fail = Cell("background-series-contrast", Verdict.FAIL)
   passing = Cell("background-series-contrast", Verdict.PASS)
   for name in ("bar", "line", "scatter", "pie"):
     for seed in range(10):
       fail_scene = assemble(fail, _type_named(fail, name), _CONFIG, random.Random(seed)).scene
-      assert fail_scene.background in set(_drawn_colours(fail_scene))
+      assert _min_distance_to_marks(fail_scene.background, fail_scene) <= T_WITHIN
       pass_scene = assemble(passing, _type_named(passing, name), _CONFIG, random.Random(seed)).scene
-      background_lab = srgb_hex_to_lab(pass_scene.background)
-      assert all(delta_e2000(background_lab, srgb_hex_to_lab(c)) >= T_WITHIN for c in _drawn_colours(pass_scene))
+      assert _min_distance_to_marks(pass_scene.background, pass_scene) >= T_VIOLATION
 
 
-def test_background_contrast_fail_keeps_every_series_colour_on_the_palette() -> None:
-  # The fail recolours nothing - it only matches the canvas to an existing series - so it never doubles as a
-  # palette-compliance fail (single-intended-issue, docs/adr/0016).
+def test_background_contrast_leaves_the_plotted_mark_colours_untouched() -> None:
+  # The rule only repaints the canvas; the marks keep their config colours, so it never doubles as a palette-compliance
+  # fail (single-intended-issue, docs/adr/0016). The background itself is deliberately palette-independent.
   cell = Cell("background-series-contrast", Verdict.FAIL)
   for seed in range(10):
     scene = assemble(cell, _type_named(cell, "bar"), _CONFIG, random.Random(seed)).scene
