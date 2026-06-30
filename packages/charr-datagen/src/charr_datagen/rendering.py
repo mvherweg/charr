@@ -163,9 +163,13 @@ def _mpl_axes(ax: Axes, scene: ChartScene) -> None:
     lowest = min(value for series in scene.series for value in series.y)
     ax.set_ylim(bottom=lowest * 0.85)
   if scene.grid:
-    # Colour and weight the grid only when it is shown; passing line properties with visible=False would force it on.
-    # color drives gridline-series-contrast; linewidth drives gridline-weight (a heavy grid competes with the data).
-    ax.grid(visible=True, color=scene.gridline_color, linewidth=scene.gridline_width)
+    # Style the grid only when it is shown; passing line properties with visible=False would force it on. color drives
+    # gridline-series-contrast (every gridded type). linewidth drives gridline-weight, which is line-only, so weight the
+    # grid only on line charts and let the backend/theme default stand elsewhere - keeping the width inert off lines.
+    if scene.kind is ChartKind.LINE:
+      ax.grid(visible=True, color=scene.gridline_color, linewidth=scene.gridline_width)
+    else:
+      ax.grid(visible=True, color=scene.gridline_color)
   else:
     ax.grid(visible=False)
   if scene.show_legend:
@@ -246,8 +250,11 @@ def _draw_plotly(scene: ChartScene, out: Path) -> None:
     width=600,
     height=400,
   )
-  figure.update_xaxes(showgrid=scene.grid, gridcolor=scene.gridline_color, gridwidth=scene.gridline_width)
-  figure.update_yaxes(showgrid=scene.grid, gridcolor=scene.gridline_color, gridwidth=scene.gridline_width)
+  # gridline-weight is line-only, so set the explicit grid width only on line charts; None leaves plotly's default,
+  # keeping the width inert off lines (matching the matplotlib path).
+  gridwidth = scene.gridline_width if scene.kind is ChartKind.LINE else None
+  figure.update_xaxes(showgrid=scene.grid, gridcolor=scene.gridline_color, gridwidth=gridwidth)
+  figure.update_yaxes(showgrid=scene.grid, gridcolor=scene.gridline_color, gridwidth=gridwidth)
   if scene.kind is ChartKind.BAR and not scene.y_baseline_zero:
     lowest = min(value for series in scene.series for value in series.y)
     highest = max(value for series in scene.series for value in series.y)
