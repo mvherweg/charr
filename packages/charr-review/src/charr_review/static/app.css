@@ -1,0 +1,173 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  color: #1a1a1a;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #ddd;
+  background: #fafafa;
+  flex-wrap: wrap;
+}
+
+#bar h1 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.summary {
+  display: flex;
+  gap: 8px;
+}
+
+.summary .chip {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eee;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+#warnings {
+  display: flex;
+  flex-direction: column;
+}
+
+.warning {
+  padding: 6px 16px;
+  background: #fff4e0;
+  border-bottom: 1px solid #f0d8a8;
+  color: #7a4d00;
+}
+
+main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+#list {
+  width: 380px;
+  overflow-y: auto;
+  border-right: 1px solid #ddd;
+  outline: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: #f5f7ff;
+}
+
+.row.selected {
+  background: #e6edff;
+}
+
+.row .rule {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row .verdicts {
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.outcome-TP {
+  background: #d6f5d6;
+  color: #14620f;
+}
+
+.outcome-TN {
+  background: #e8e8e8;
+  color: #444;
+}
+
+.outcome-FP {
+  background: #ffe0e0;
+  color: #9a1010;
+}
+
+.outcome-FN {
+  background: #ffd9b3;
+  color: #8a4b00;
+}
+
+.outcome-ERROR {
+  background: #333;
+  color: #fff;
+}
+
+#detail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 16px;
+  gap: 16px;
+}
+
+#chart img {
+  max-width: 100%;
+  max-height: 60vh;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+#meta {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 760px;
+}
+
+#meta th {
+  text-align: left;
+  width: 130px;
+  vertical-align: top;
+  padding: 4px 12px 4px 0;
+  color: #555;
+  font-weight: 600;
+}
+
+#meta td {
+  padding: 4px 0;
+  vertical-align: top;
+}
+
+.empty {
+  padding: 24px;
+  color: #888;
+}

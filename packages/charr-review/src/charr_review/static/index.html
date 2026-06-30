@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Charr review</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <header id="bar">
+      <h1>Charr review</h1>
+      <div id="summary" class="summary"></div>
+      <label class="toggle">
+        <input type="checkbox" id="only-mismatches" checked />
+        only mismatches / errors
+      </label>
+      <select id="rule-filter" aria-label="Filter by rule">
+        <option value="">all rules</option>
+      </select>
+    </header>
+    <div id="warnings"></div>
+    <main>
+      <aside id="list" tabindex="0" aria-label="Results"></aside>
+      <section id="detail">
+        <div id="chart">
+          <img id="chart-img" alt="chart" />
+        </div>
+        <table id="meta"></table>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
