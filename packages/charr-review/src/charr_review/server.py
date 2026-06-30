@@ -75,5 +75,11 @@ def serve(
   """
   app = create_app(data, dataset_dir)
   if open_browser:
-    webbrowser.open(f"http://{host}:{port}/")
+    webbrowser.open(_browser_url(host, port))
   app.run(host=host, port=port, threaded=True)
+
+
+def _browser_url(host: str, port: int) -> str:
+  # A wildcard bind host is not a usable URL; open loopback instead while still binding where asked.
+  browser_host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host  # noqa: S104 - URL to open, not a bind
+  return f"http://{browser_host}:{port}/"

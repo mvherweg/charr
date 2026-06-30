@@ -170,6 +170,10 @@ function prefetch(position) {
 }
 
 function onKey(event) {
+  // Leave form controls (and modified key chords) to the browser, so e.g. the rule dropdown navigates normally.
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  const tag = event.target && event.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
   if (event.key === "ArrowDown" || event.key === "j") {
     event.preventDefault();
     select(state.selected + 1);

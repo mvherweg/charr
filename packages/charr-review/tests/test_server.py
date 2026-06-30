@@ -5,7 +5,7 @@ from pathlib import Path
 
 from charr.models import Verdict
 from charr_review.data import SubstrateRecord, load_rows
-from charr_review.server import create_app
+from charr_review.server import _browser_url, create_app
 
 MakeReview = Callable[[Sequence[SubstrateRecord]], tuple[Path, Path]]
 
@@ -62,3 +62,9 @@ def test_static_asset_is_served(make_review: MakeReview) -> None:
   substrate, dataset = make_review([_record()])
   client = create_app(load_rows(substrate, dataset), dataset).test_client()
   assert client.get("/static/app.js").status_code == 200
+
+
+def test_browser_url_opens_loopback_for_a_wildcard_bind_host() -> None:
+  assert _browser_url("0.0.0.0", 8000) == "http://127.0.0.1:8000/"  # noqa: S104 - asserting the wildcard remap
+  assert _browser_url("::", 8000) == "http://127.0.0.1:8000/"
+  assert _browser_url("127.0.0.1", 8731) == "http://127.0.0.1:8731/"
