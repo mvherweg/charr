@@ -58,3 +58,4 @@ alternatives are still live instead of being reverse-engineered in code review.
 | 0022 | [A separate `charr-review` package consuming the eval substrate as a contract](0022-charr-review-package-and-substrate-contract.md)  | Accepted |
 | 0023 | [Flask for the `charr-review` web app](0023-flask-for-charr-review-web-app.md)                                                       | Accepted |
 | 0024 | [charr-eval discovers manifests from files or directories, naming each by absolute path](0024-eval-manifest-discovery-and-naming.md) | Accepted |
+| 0025 | [charr-eval is a pure scorer of a saved check output](0025-eval-pure-scorer-of-saved-predictions.md)                                 | Accepted |

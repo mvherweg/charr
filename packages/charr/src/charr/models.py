@@ -102,3 +102,16 @@ class Report(BaseModel):
     :return: A JSON string with sorted keys and two-space indentation.
     """
     return json.dumps(self.model_dump(mode="json"), indent=2, sort_keys=True)
+
+  @classmethod
+  def from_json(cls, text: str) -> "Report":
+    """Parse a report previously emitted by :meth:`to_json` (a saved ``charr check`` output).
+
+    This is the round-trip partner of :meth:`to_json`, kept here so producing and consuming the report
+    stay in one place. It does no I/O; the caller reads the bytes.
+
+    :param text: The JSON text of a saved report.
+    :return: The parsed report.
+    :raises pydantic.ValidationError: If ``text`` is not a valid report.
+    """
+    return cls.model_validate_json(text)
