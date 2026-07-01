@@ -20,6 +20,7 @@ from charr.config import Config, load_config, load_llm_settings
 from charr.llm import LlmClient, OpenAiCompatClient
 from charr.models import CharrError
 
+from charr_eval.manifest import discover_manifests, manifest_display_name
 from charr_eval.runner import evaluate_manifest
 from charr_eval.scoring import MacroAverage, RuleScore, Scoreboard, Section, SubstrateRecord, build_scoreboard
 
@@ -38,7 +39,13 @@ def build_parser() -> argparse.ArgumentParser:
     prog="charr-eval",
     description="Score the Charr checker against labeled chart manifests and report per-rule metrics.",
   )
-  parser.add_argument("manifests", nargs="+", type=Path, metavar="MANIFEST", help="JSONL manifest file(s) to score.")
+  parser.add_argument(
+    "manifests",
+    nargs="+",
+    type=Path,
+    metavar="PATH",
+    help="Manifest file(s), or directories to search recursively for labels.jsonl.",
+  )
   parser.add_argument("--model", default=None, help="Override the CHARR_LLM_MODEL for this run.")
   parser.add_argument(
     "--config",
@@ -97,12 +104,10 @@ def _evaluate_all(
   config_path: Path | None,
 ) -> list[SubstrateRecord]:
   records: list[SubstrateRecord] = []
-  for manifest in manifests:
-    if not manifest.is_file():
-      msg = f"manifest not found: {manifest}"
-      raise CharrError(msg)
+  for manifest in discover_manifests(manifests):
     config = _config_for(manifest, config_path)
-    records.extend(evaluate_manifest(manifest, client=client, config=config))
+    name = manifest_display_name(manifest)
+    records.extend(evaluate_manifest(manifest, name=name, client=client, config=config))
   return records
 
 

@@ -7,9 +7,10 @@ charr's :class:`~charr.models.Verdict` and :class:`~charr.models.RuleId`, keepin
 vocabulary even though the struct is duplicated by design.
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 
-from charr.models import RuleId, Verdict
+from charr.models import CharrError, RuleId, Verdict
 from pydantic import BaseModel, ConfigDict
 
 
@@ -50,3 +51,49 @@ def resolve_image(manifest_path: Path, record: ManifestRecord) -> Path:
   :return: The absolute image path (not checked for existence here).
   """
   return (manifest_path.parent / record.image).resolve()
+
+
+def discover_manifests(paths: Sequence[Path]) -> list[Path]:
+  """Expand the command-line path arguments into the concrete list of manifest files to score.
+
+  Each argument is either a manifest **file** (taken as-is; an explicitly named file need not be called
+  ``labels.jsonl``) or a **directory**, which is searched recursively for ``labels.jsonl`` files. Duplicates - for
+  example a directory and a file it contains, both passed - are removed while keeping first-seen order.
+
+  :param paths: The path arguments as given on the command line (files and/or directories).
+  :return: The manifest files to score, deduplicated and in a deterministic order.
+  :raises CharrError: If an argument is neither an existing file nor a directory, or a directory contains no
+    ``labels.jsonl``.
+  """
+  manifests: list[Path] = []
+  seen: set[Path] = set()
+  for path in paths:
+    if path.is_dir():
+      candidates = sorted(path.rglob("labels.jsonl"))
+      if not candidates:
+        msg = f"no labels.jsonl manifests under: {path}"
+        raise CharrError(msg)
+    elif path.is_file():
+      candidates = [path]
+    else:
+      msg = f"manifest path not found: {path}"
+      raise CharrError(msg)
+    for manifest in candidates:
+      key = manifest.resolve()
+      if key not in seen:
+        seen.add(key)
+        manifests.append(manifest)
+  return manifests
+
+
+def manifest_display_name(path: Path) -> str:
+  """Return the label a manifest carries throughout the results: its canonical absolute path.
+
+  The absolute path is unambiguous and collision-free, so distinct datasets never merge in the per-manifest report even
+  when they all use the conventional ``labels.jsonl`` filename. This is deliberately a plain, swappable naming policy -
+  a friendlier provider-declared name is future work (the manifest format carries no name of its own today).
+
+  :param path: A manifest file path.
+  :return: The resolved absolute path, as a string.
+  """
+  return str(path.resolve())

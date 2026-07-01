@@ -33,9 +33,14 @@ within it is a recommended convention for self-containment, nothing more.
 
 - A **test set** is one or more manifests, unioned. Records are keyed by `(manifest, image-path)`, so two manifests that
   reference the same image stay distinct data points.
-- Results are **reported per manifest**, each identified by a display name defaulting to the manifest's filename stem
-  (so a report reads `production-q2: ...`). This is the per-grouping reported dimension the forces call for, and the
-  manifest's path doubles as its provenance.
+- `charr-eval` is pointed at **files or directories**: a file is scored as one manifest; a directory is searched
+  recursively for `labels.jsonl` files. This lets a caller list individual manifests (possibly across unrelated trees)
+  or hand a single dataset root over for discovery.
+- Results are **reported per manifest**, each identified by its **absolute path**. The path is unambiguous and
+  collision-free, so datasets that all use the conventional `labels.jsonl` filename never merge in the report. This is a
+  deliberately plain naming policy, isolated in one function: a friendlier, provider-declared name is future work
+  (issue #31), because the manifest format carries no name of its own and `charr-eval` cannot lean on `charr-datagen`'s
+  metadata (it must score any conforming dataset - see [ADR-0010](0010-three-packages-eval-drives-charr.md)).
 - Image paths are relative to the manifest and may include subdirectories (and, by the no-enforcement rule, may point
   outside the manifest's tree).
 

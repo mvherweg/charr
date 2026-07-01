@@ -43,6 +43,28 @@ def test_main_scores_a_manifest_end_to_end_with_a_fake_backend(
   assert substrate_out.read_text(encoding="ascii").strip()
 
 
+def test_main_discovers_manifests_under_a_directory_and_names_them_by_absolute_path(
+  monkeypatch: pytest.MonkeyPatch,
+  capsys: pytest.CaptureFixture[str],
+  tmp_path: Path,
+) -> None:
+  _set_credentials(monkeypatch)
+  monkeypatch.setattr(cli, "OpenAiCompatClient", lambda *args, **kwargs: _PassClient())  # noqa: ARG005
+  for config in ("config-00", "config-01"):
+    (tmp_path / config / "images").mkdir(parents=True)
+    (tmp_path / config / "images" / "a.png").write_bytes(b"\x89PNG")
+    record = ManifestRecord(image="images/a.png", library="matplotlib", labels={"has-title": Verdict.PASS})
+    (tmp_path / config / "labels.jsonl").write_text(record.model_dump_json() + "\n", encoding="utf-8")
+  substrate_out = tmp_path / "substrate.jsonl"
+  exit_code = cli.main([str(tmp_path), "--substrate-out", str(substrate_out)])
+  assert exit_code == cli.EXIT_OK
+  out = capsys.readouterr().out
+  assert "== overall ==" in out
+  # Point at the parent directory; each config's labels.jsonl is discovered and labelled by its distinct absolute path.
+  assert f"== {(tmp_path / 'config-00' / 'labels.jsonl').resolve()} ==" in out
+  assert f"== {(tmp_path / 'config-01' / 'labels.jsonl').resolve()} ==" in out
+
+
 def test_main_returns_cannot_run_without_credentials(
   monkeypatch: pytest.MonkeyPatch,
   make_dataset: Callable[[Sequence[ManifestRecord]], Path],

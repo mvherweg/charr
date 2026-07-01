@@ -17,20 +17,21 @@ from charr_eval.manifest import ManifestRecord, read_manifest, resolve_image
 from charr_eval.scoring import SubstrateRecord
 
 
-def evaluate_manifest(manifest_path: Path, *, client: LlmClient, config: Config) -> list[SubstrateRecord]:
+def evaluate_manifest(manifest_path: Path, *, name: str, client: LlmClient, config: Config) -> list[SubstrateRecord]:
   """Run the checker over every image in ``manifest_path`` and return the per-rule substrate records.
 
-  :param manifest_path: The manifest to evaluate; its filename stem names the manifest in the results.
+  :param manifest_path: The manifest to evaluate.
+  :param name: The label to stamp on every record as this manifest's identity in the results; the caller derives it
+    (see :func:`charr_eval.manifest.manifest_display_name`), keeping naming policy out of the runner.
   :param client: The LLM client the checker drives (a real backend in the CLI; a fake in tests).
   :param config: The checker configuration to evaluate under (typically discovered next to the manifest).
   :return: One :class:`SubstrateRecord` per ``(image, rule)`` in the manifest.
   :raises ValueError: If the manifest itself is malformed (a dataset error, not a checker error).
   """
-  manifest_name = manifest_path.stem
   records: list[SubstrateRecord] = []
   for record in read_manifest(manifest_path):
     predicted, error = _check_one(resolve_image(manifest_path, record), config=config, client=client)
-    records.extend(_image_records(manifest_name, record, predicted, error))
+    records.extend(_image_records(name, record, predicted, error))
   return records
 
 
