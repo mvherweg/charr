@@ -7,8 +7,9 @@ palette/font rules are judged against the expectations the charts were drawn for
 ``meta.json`` at ``out_dir`` indexes the configs.
 
 Each config independently stratifies and allocates the budget across cells (docs/adr/0014), so every ``config-NN/`` is a
-valid standalone eval unit; scoring a saved ``charr check`` output over several of them unions the results. Font-compliance cells are kept off the
-plotly backend, and any plotly image carries ``font-compliance: not_applicable``, because kaleido cannot be trusted to
+valid standalone eval unit; scoring a saved ``charr check`` output over several of them unions the results.
+Font-compliance cells are kept off the plotly backend, and any plotly image carries ``font-compliance: not_applicable``,
+because kaleido cannot be trusted to
 render a bundled font faithfully (docs/adr/0021). A run is deterministic in ``(samples, configs, seed)`` for a fixed
 active library set.
 """
