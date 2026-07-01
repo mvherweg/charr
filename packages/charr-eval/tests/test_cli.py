@@ -61,6 +61,35 @@ def test_main_returns_cannot_run_for_a_missing_manifest(monkeypatch: pytest.Monk
   assert cli.main([str(tmp_path / "nope.jsonl")]) == cli.EXIT_CANNOT_RUN
 
 
+def test_main_returns_cannot_run_for_a_malformed_manifest(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+  _set_credentials(monkeypatch)
+  monkeypatch.setattr(cli, "OpenAiCompatClient", lambda *args, **kwargs: _PassClient())  # noqa: ARG005
+  manifest = tmp_path / "labels.jsonl"
+  manifest.write_text("not json\n", encoding="utf-8")
+  assert cli.main([str(manifest)]) == cli.EXIT_CANNOT_RUN
+
+
+def test_main_does_not_mask_an_unexpected_error_as_cannot_run(
+  monkeypatch: pytest.MonkeyPatch,
+  make_dataset: Callable[[Sequence[ManifestRecord]], Path],
+) -> None:
+  # A programming fault (here a stand-in ValueError from persistence, as a UnicodeEncodeError once was) must crash,
+  # not be swallowed into exit 2 - otherwise real bugs masquerade as "cannot run".
+  _set_credentials(monkeypatch)
+  monkeypatch.setattr(cli, "OpenAiCompatClient", lambda *args, **kwargs: _PassClient())  # noqa: ARG005
+
+  def _boom(*args: object, **kwargs: object) -> None:  # noqa: ARG001
+    msg = "unexpected fault"
+    raise ValueError(msg)
+
+  monkeypatch.setattr(cli, "_persist_substrate", _boom)
+  manifest = make_dataset(
+    [ManifestRecord(image="images/a.png", library="matplotlib", labels={"has-title": Verdict.PASS})]
+  )
+  with pytest.raises(ValueError, match="unexpected fault"):
+    cli.main([str(manifest)])
+
+
 def test_format_report_renders_overall_and_macro() -> None:
   score = RuleScore("has-title", support=2, fail_support=1, error_count=0, precision=1.0, recall=1.0, accuracy=1.0)
   macro = MacroAverage(precision=1.0, recall=1.0, accuracy=1.0)

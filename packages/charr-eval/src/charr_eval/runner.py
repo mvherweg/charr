@@ -24,7 +24,7 @@ def evaluate_manifest(manifest_path: Path, *, client: LlmClient, config: Config)
   :param client: The LLM client the checker drives (a real backend in the CLI; a fake in tests).
   :param config: The checker configuration to evaluate under (typically discovered next to the manifest).
   :return: One :class:`SubstrateRecord` per ``(image, rule)`` in the manifest.
-  :raises ValueError: If the manifest itself is malformed (a dataset error, not a checker error).
+  :raises CharrError: If the manifest itself is malformed (a dataset error, not a checker error).
   """
   manifest_name = manifest_path.stem
   records: list[SubstrateRecord] = []

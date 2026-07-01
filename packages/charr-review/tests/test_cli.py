@@ -66,6 +66,23 @@ def test_main_returns_cannot_run_for_a_malformed_substrate(
   assert "malformed substrate" in capsys.readouterr().err
 
 
+def test_main_does_not_mask_an_unexpected_error_as_cannot_run(
+  make_review: MakeReview,
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  # A programming fault must crash, not be swallowed into exit 2; only CharrError/OSError are "cannot run".
+  substrate, dataset = make_review([_record()])
+
+  def _boom(*args: object, **kwargs: object) -> None:  # noqa: ARG001
+    msg = "unexpected fault"
+    raise ValueError(msg)
+
+  monkeypatch.setattr(cli, "_load", _boom)
+  monkeypatch.setattr(cli, "serve", lambda *args, **kwargs: None)  # noqa: ARG005
+  with pytest.raises(ValueError, match="unexpected fault"):
+    cli.main([str(substrate), "-d", str(dataset), "--no-open"])
+
+
 def test_main_prints_warnings_to_stderr(
   make_review: MakeReview,
   monkeypatch: pytest.MonkeyPatch,
