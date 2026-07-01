@@ -79,7 +79,10 @@ def main(argv: Sequence[str] | None = None) -> int:
       client = OpenAiCompatClient(settings, session=session)
       records = _evaluate_all(args.manifests, client=client, config_path=args.config)
     _persist_substrate(args.substrate_out, records)
-  except (CharrError, ValueError, OSError) as exc:
+  except (CharrError, OSError) as exc:
+    # Only expected operational failures are reported as "cannot run": CharrError (bad credentials/config, malformed
+    # manifest) and OSError (unreadable/unwritable files). A bare ValueError or any other exception is a programming
+    # fault and must surface as a crash, not be masked as exit 2 (this is what once hid a UnicodeEncodeError here).
     sys.stderr.write(f"charr-eval: {exc}\n")
     return EXIT_CANNOT_RUN
   sys.stdout.write(format_report(build_scoreboard(records)) + "\n")

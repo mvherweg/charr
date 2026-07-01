@@ -53,7 +53,10 @@ def main(argv: Sequence[str] | None = None) -> int:
   args = build_parser().parse_args(argv)
   try:
     data = _load(args.substrate, args.dataset_dir)
-  except (CharrError, ValueError, OSError) as exc:
+  except (CharrError, OSError) as exc:
+    # Only expected operational failures are reported as "cannot run": CharrError (missing substrate/dataset dir,
+    # malformed substrate) and OSError (unreadable files). Any other exception is a programming fault and must surface
+    # as a crash rather than be masked as exit 2.
     sys.stderr.write(f"charr-review: {exc}\n")
     return EXIT_CANNOT_RUN
   for warning in data.warnings:

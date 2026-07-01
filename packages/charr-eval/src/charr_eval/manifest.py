@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from charr.models import CharrError, RuleId, Verdict
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 
 class ManifestRecord(BaseModel):
@@ -29,7 +29,8 @@ def read_manifest(path: Path) -> list[ManifestRecord]:
 
   :param path: The manifest file to read.
   :return: The records in file order.
-  :raises ValueError: If a non-blank line is not a valid :class:`ManifestRecord`.
+  :raises CharrError: If a non-blank line is not a valid :class:`ManifestRecord` (a dataset error, distinct from a
+    programming fault, so the CLI can report it cleanly rather than crash).
   """
   records: list[ManifestRecord] = []
   for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
@@ -37,9 +38,9 @@ def read_manifest(path: Path) -> list[ManifestRecord]:
       continue
     try:
       records.append(ManifestRecord.model_validate_json(line))
-    except ValueError as exc:
+    except ValidationError as exc:
       msg = f"{path}:{number}: invalid manifest record: {exc}"
-      raise ValueError(msg) from exc
+      raise CharrError(msg) from exc
   return records
 
 
