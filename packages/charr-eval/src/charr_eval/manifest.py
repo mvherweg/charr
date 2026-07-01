@@ -70,7 +70,9 @@ def discover_manifests(paths: Sequence[Path]) -> list[Path]:
   seen: set[Path] = set()
   for path in paths:
     if path.is_dir():
-      candidates = sorted(path.rglob("labels.jsonl"))
+      # Filter to files: rglob matches by name, so a directory literally named labels.jsonl would otherwise be
+      # returned and then fail with IsADirectoryError when read.
+      candidates = sorted(p for p in path.rglob("labels.jsonl") if p.is_file())
       if not candidates:
         msg = f"no labels.jsonl manifests under: {path}"
         raise CharrError(msg)

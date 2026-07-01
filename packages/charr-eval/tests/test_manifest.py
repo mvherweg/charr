@@ -57,6 +57,12 @@ def test_discover_manifests_walks_a_directory_recursively_in_sorted_order(tmp_pa
   ]
 
 
+def test_discover_manifests_ignores_a_directory_named_like_a_manifest(tmp_path: Path) -> None:
+  (tmp_path / "decoy" / "labels.jsonl").mkdir(parents=True)  # a directory, not a manifest file
+  real = _write_manifest(tmp_path / "real" / "labels.jsonl")
+  assert discover_manifests([tmp_path]) == [real]
+
+
 def test_discover_manifests_takes_an_explicit_file_even_if_not_named_labels(tmp_path: Path) -> None:
   manifest = _write_manifest(tmp_path / "curated.jsonl")
   assert discover_manifests([manifest]) == [manifest]
