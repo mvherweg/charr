@@ -22,7 +22,7 @@ This repo is a uv workspace with three separate packages:
 
 - `packages/charr` - the chart checker (CLI), the primary deliverable.
 - `packages/charr-datagen` - the data generator: synthetic charts with ground-truth labels for evaluating the checker.
-- `packages/charr-eval` - the evaluator: scores the checker against a labeled dataset and reports per-rule metrics.
+- `packages/charr-eval` - the evaluator: scores a saved `charr check` output against a labeled dataset and reports per-rule metrics.
 
 ## License
 

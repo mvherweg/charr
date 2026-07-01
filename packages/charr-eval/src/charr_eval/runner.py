@@ -1,57 +1,49 @@
-"""Drive the checker over a manifest's images and capture each per-rule outcome as a substrate record.
+"""Join a manifest's ground-truth labels to a saved check output and fold each per-rule outcome into a substrate record.
 
-This is where ``charr-eval`` actually *uses* the checker (docs/adr/0010): it calls :func:`charr.checker.run_check` one
-image at a time so a single bad image degrades to an ``error`` bucket instead of aborting the whole evaluation. The
-checker's config is discovered next to the manifest, so a generated dataset's own ``charr.toml`` (palette/font
-expectations) is what the checker is told. The captured raw rationale is kept on each record for failure analysis.
+This is the score side of the run/score split (docs/adr/0025): instead of driving the checker, the evaluator reads the
+predictions produced by an earlier ``charr check`` run (see :mod:`charr_eval.predictions`) and matches them to the
+manifest's labels image by image. An image the manifest expects but the predictions do not cover degrades to an
+``error`` bucket for that image's rules rather than aborting the whole evaluation. The captured raw rationale is kept on
+each record for failure analysis.
 """
 
 from pathlib import Path
 
-from charr.checker import run_check
-from charr.config import Config
-from charr.llm import LlmClient
-from charr.models import CharrError, RuleId, Verdict
+from charr.models import RuleId, Verdict
 
 from charr_eval.manifest import ManifestRecord, read_manifest, resolve_image
+from charr_eval.predictions import PredictionsByImage
 from charr_eval.scoring import SubstrateRecord
 
 
-def evaluate_manifest(manifest_path: Path, *, name: str, client: LlmClient, config: Config) -> list[SubstrateRecord]:
-  """Run the checker over every image in ``manifest_path`` and return the per-rule substrate records.
+def evaluate_manifest(
+  manifest_path: Path,
+  *,
+  name: str,
+  predictions: PredictionsByImage,
+) -> tuple[list[SubstrateRecord], set[Path]]:
+  """Score ``manifest_path``'s labels against ``predictions`` and return the substrate records plus consumed keys.
 
   :param manifest_path: The manifest to evaluate.
   :param name: The label to stamp on every record as this manifest's identity in the results; the caller derives it
     (see :func:`charr_eval.manifest.manifest_display_name`), keeping naming policy out of the runner.
-  :param client: The LLM client the checker drives (a real backend in the CLI; a fake in tests).
-  :param config: The checker configuration to evaluate under (typically discovered next to the manifest).
-  :return: One :class:`SubstrateRecord` per ``(image, rule)`` in the manifest.
+  :param predictions: The saved check output, indexed by resolved image path (see
+    :func:`charr_eval.predictions.load_predictions`).
+  :return: A pair of (one :class:`SubstrateRecord` per ``(image, rule)`` in the manifest, the set of prediction keys
+    this manifest matched). The caller unions the consumed keys across manifests to spot predictions matched by none.
   :raises CharrError: If the manifest itself is malformed (a dataset error, not a checker error).
   """
   records: list[SubstrateRecord] = []
+  consumed: set[Path] = set()
   for record in read_manifest(manifest_path):
-    predicted, error = _check_one(resolve_image(manifest_path, record), config=config, client=client)
-    records.extend(_image_records(name, record, predicted, error))
-  return records
-
-
-def _check_one(
-  image: Path,
-  *,
-  config: Config,
-  client: LlmClient,
-) -> tuple[dict[RuleId, tuple[Verdict, str]], str | None]:
-  """Check one image, returning ``(rule_id -> (verdict, rationale), error)``; ``error`` set means the image errored."""
-  if not image.is_file():
-    return {}, f"image not found: {image}"
-  try:
-    report = run_check([image], config, client)
-  except (CharrError, OSError) as exc:
-    # CharrError covers every operational checker/backend failure; OSError covers an unreadable image file (the bytes
-    # are read outside the checker's error model). Both degrade this one image to the error bucket, never aborting.
-    return {}, str(exc)
-  verdicts = {verdict.rule_id: (verdict.verdict, verdict.rationale) for verdict in report.images[0].verdicts}
-  return verdicts, None
+    key = resolve_image(manifest_path, record)
+    predicted = predictions.get(key)
+    if predicted is None:
+      records.extend(_image_records(name, record, {}, f"no prediction for image: {key}"))
+    else:
+      consumed.add(key)
+      records.extend(_image_records(name, record, predicted, None))
+  return records, consumed
 
 
 def _image_records(
@@ -60,7 +52,7 @@ def _image_records(
   predicted: dict[RuleId, tuple[Verdict, str]],
   error: str | None,
 ) -> list[SubstrateRecord]:
-  """Fold one image's outcome into per-rule substrate records, mapping a checker error to the error bucket."""
+  """Fold one image's outcome into per-rule substrate records, mapping a missing prediction to the error bucket."""
   out: list[SubstrateRecord] = []
   for rule_id, truth in record.labels.items():
     if error is not None:

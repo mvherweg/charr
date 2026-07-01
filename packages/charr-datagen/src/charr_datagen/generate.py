@@ -7,7 +7,7 @@ palette/font rules are judged against the expectations the charts were drawn for
 ``meta.json`` at ``out_dir`` indexes the configs.
 
 Each config independently stratifies and allocates the budget across cells (docs/adr/0014), so every ``config-NN/`` is a
-valid standalone eval unit; ``charr-eval out_dir/*/labels.jsonl`` unions them. Font-compliance cells are kept off the
+valid standalone eval unit; scoring a saved ``charr check`` output over several of them unions the results. Font-compliance cells are kept off the
 plotly backend, and any plotly image carries ``font-compliance: not_applicable``, because kaleido cannot be trusted to
 render a bundled font faithfully (docs/adr/0021). A run is deterministic in ``(samples, configs, seed)`` for a fixed
 active library set.
@@ -254,7 +254,7 @@ def _write_config(path: Path, config: StyleConfig) -> None:
   fonts = json.dumps(config.font_names())
   body = (
     "# Written by charr-datagen. This is the checker config this config-NN dataset was generated against;\n"
-    "# charr-eval discovers it next to the manifest so the palette and font rules are judged against the same\n"
+    "# charr check discovers it next to the manifest so the palette and font rules are judged against the same\n"
     "# expectations the charts were drawn for. Colours are sRGB hex; fonts are family names.\n"
     f"palette = {palette}\n"
     f"fonts = {fonts}\n"

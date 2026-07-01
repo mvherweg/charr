@@ -81,7 +81,7 @@ Charr/
       pyproject.toml
       src/charr_datagen/
       tests/
-    charr-eval/             # the evaluator - scores the checker against a labeled dataset (depends on charr)
+    charr-eval/             # the evaluator - scores a saved charr check output against a labeled dataset (depends on charr)
       pyproject.toml
       src/charr_eval/
       tests/
@@ -163,8 +163,13 @@ uv run charr check report.png "charts/*.png"
 # generate a multi-config dataset sweep (one self-describing config-NN/ dataset per style-config)
 uv run charr-datagen generate --out ./set --configs 4 --samples 60 --seed 0
 
-# score the checker across every config's manifest (unioned; needs CHARR_LLM_* set; manual/dev use)
-uv run charr-eval ./set/*/labels.jsonl
+# 1) run the checker over a config's images, saving its JSON report as the predictions to score
+#    (needs CHARR_LLM_* set; manual/dev use). Redirect stdout to a file.
+uv run charr check ./set/config-00/images > preds-00.json
+
+# 2) score the saved predictions against one or more manifests (offline; no LLM, no credentials).
+#    Pass the check output first, then manifest files or directories (unioned).
+uv run charr-eval preds-00.json ./set/config-00/labels.jsonl
 
 # browse an eval run image-by-image (read-only): expected vs predicted verdicts + the model's rationale
 # pass the substrate plus the dataset root it was scored against (one substrate <-> one dataset; docs/adr/0022)
@@ -239,7 +244,8 @@ uv run pytest packages/charr  # one package
 
 - Use **long, clearly descriptive test names** that read as a sentence about the behavior under test.
 - Keep tests deterministic. Where a test would otherwise hit a real LLM endpoint, stub/mock the backend so the suite
-  runs offline and fast; reserve real-model runs for `charr-eval` against a generated dataset.
+  runs offline and fast; reserve real-model runs for `charr check` producing a report over a generated dataset
+  (`charr-eval` then scores that saved report offline).
 
 ## Checks and CI
 

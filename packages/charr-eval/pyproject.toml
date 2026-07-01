@@ -5,9 +5,10 @@ description = "Charr evaluator: score the checker against a labeled chart datase
 requires-python = ">=3.13"
 license = "MIT"
 authors = [{ name = "Michiel Van Herwegen", email = "michiel@vanherwegen.com" }]
-# Depends on charr (it drives the checker: run_check, the OpenAI-compatible client, config + credential loading, and the
-# Verdict/RuleId vocabulary). It deliberately does NOT depend on charr-datagen: eval scores any dataset in the manifest
-# format, generated or hand-curated, so it owns its own reader (docs/adr/0010, docs/adr/0011).
+# Depends on charr for MODELS ONLY (Report/RuleVerdict/Verdict/RuleId): eval parses a saved `charr check` output and
+# shares the verdict vocabulary. It is a pure scorer - it no longer runs the checker or needs an LLM client
+# (docs/adr/0025). It deliberately does NOT depend on charr-datagen: eval scores any dataset in the manifest format,
+# generated or hand-curated, so it owns its own reader (docs/adr/0010, docs/adr/0011).
 dependencies = [
   "charr",
   "pydantic>=2",
