@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from charr.models import Verdict
+from charr.models import CharrError, Verdict
 from charr_eval.manifest import ManifestRecord, read_manifest, resolve_image
 
 
@@ -26,7 +26,7 @@ def test_read_manifest_skips_blank_lines(tmp_path: Path) -> None:
 def test_read_manifest_rejects_a_malformed_line(tmp_path: Path) -> None:
   path = tmp_path / "labels.jsonl"
   path.write_text("not json\n", encoding="ascii")
-  with pytest.raises(ValueError, match="invalid manifest record"):
+  with pytest.raises(CharrError, match="invalid manifest record"):
     read_manifest(path)
 
 
