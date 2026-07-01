@@ -34,6 +34,14 @@ def test_load_predictions_rejects_a_malformed_report(tmp_path: Path) -> None:
     load_predictions(path)
 
 
+def test_load_predictions_rejects_a_non_utf8_file(tmp_path: Path) -> None:
+  # The wrong path handed in (e.g. a PNG or an archive) is bad input, not a crash. 0xFF is invalid UTF-8.
+  path = tmp_path / "check.json"
+  path.write_bytes(b"\xff\xfe not text")
+  with pytest.raises(CharrError, match="invalid charr check output"):
+    load_predictions(path)
+
+
 def test_load_predictions_rejects_duplicate_image_entries(tmp_path: Path) -> None:
   image = tmp_path / "a.png"
   path = tmp_path / "check.json"

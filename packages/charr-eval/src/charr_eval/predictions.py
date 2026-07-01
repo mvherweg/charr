@@ -29,7 +29,10 @@ def load_predictions(path: Path) -> PredictionsByImage:
   """
   try:
     report = Report.from_json(path.read_text(encoding="utf-8"))
-  except ValidationError as exc:
+  except (UnicodeDecodeError, ValidationError) as exc:
+    # A non-UTF-8 file (e.g. the wrong path handed in - a PNG or an archive) or a well-formed-but-wrong-shape JSON are
+    # both bad input, not programming faults: report them cleanly rather than crashing. OSError (missing/unreadable
+    # file) is left to propagate; the CLI maps it to "cannot run" too.
     msg = f"{path}: invalid charr check output: {exc}"
     raise CharrError(msg) from exc
   predictions: PredictionsByImage = {}
