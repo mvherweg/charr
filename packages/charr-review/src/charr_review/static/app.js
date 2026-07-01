@@ -3,17 +3,36 @@
 // Single-page review UI. The whole substrate arrives once as JSON; navigation, filtering, and image prefetch are all
 // client-side so stepping through results stays instant (see docs/adr/0023).
 
+// The confusion outcomes, in display order, with human labels. Keys match data.Outcome (app-side mirror). TN is split
+// into an exact agreement (pass/pass, na/na) and a loose one (pass vs not_applicable) so each can be filtered on its own.
+const OUTCOMES = [
+  { key: "TP", label: "TP" },
+  { key: "FP", label: "FP" },
+  { key: "FN", label: "FN" },
+  { key: "TN_EXACT", label: "TN (exact)" },
+  { key: "TN_LOOSE", label: "TN (loose)" },
+  { key: "ERROR", label: "ERROR" },
+];
+// Default view: the fail-class errors plus the error bucket - the old "only mismatches / errors" set, now explicit.
+const DEFAULT_OUTCOMES = ["FP", "FN", "ERROR"];
+
+function outcomeLabel(key) {
+  const found = OUTCOMES.find((o) => o.key === key);
+  return found ? found.label : key;
+}
+
 const state = {
   rows: [],
   filtered: [],
   selected: 0,
+  outcomes: new Set(DEFAULT_OUTCOMES),
 };
 
 const els = {
   summary: document.getElementById("summary"),
   warnings: document.getElementById("warnings"),
   ruleFilter: document.getElementById("rule-filter"),
-  onlyMismatches: document.getElementById("only-mismatches"),
+  outcomeFilters: document.getElementById("outcome-filters"),
   list: document.getElementById("list"),
   img: document.getElementById("chart-img"),
   meta: document.getElementById("meta"),
@@ -29,21 +48,46 @@ async function init() {
   state.rows = data.rows;
   renderSummary(data.summary);
   renderWarnings(data.warnings);
+  renderOutcomeFilters(data.summary);
   populateRuleFilter(state.rows);
 
-  els.onlyMismatches.addEventListener("change", applyFilter);
   els.ruleFilter.addEventListener("change", applyFilter);
   document.addEventListener("keydown", onKey);
   applyFilter();
 }
 
+function renderOutcomeFilters(summary) {
+  els.outcomeFilters.innerHTML = "";
+  for (const { key, label } of OUTCOMES) {
+    const active = state.outcomes.has(key);
+    const chip = document.createElement("label");
+    chip.className = "filter-chip outcome-" + key + (active ? "" : " off");
+
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = active;
+    box.addEventListener("change", () => {
+      if (box.checked) state.outcomes.add(key);
+      else state.outcomes.delete(key);
+      chip.classList.toggle("off", !box.checked);
+      applyFilter();
+    });
+
+    const text = document.createElement("span");
+    text.textContent = label + " (" + (summary[key] || 0) + ")";
+
+    chip.append(box, text);
+    els.outcomeFilters.appendChild(chip);
+  }
+}
+
 function renderSummary(summary) {
-  const order = ["total", "mismatches", "TP", "FP", "FN", "TN", "ERROR"];
+  const order = ["total", ...OUTCOMES.map((o) => o.key)];
   els.summary.innerHTML = "";
   for (const key of order) {
     const chip = document.createElement("span");
     chip.className = "chip";
-    chip.textContent = key + ": " + (summary[key] || 0);
+    chip.textContent = (key === "total" ? "total" : outcomeLabel(key)) + ": " + (summary[key] || 0);
     els.summary.appendChild(chip);
   }
 }
@@ -69,10 +113,9 @@ function populateRuleFilter(rows) {
 }
 
 function applyFilter() {
-  const onlyMismatches = els.onlyMismatches.checked;
   const rule = els.ruleFilter.value;
   state.filtered = state.rows.filter((row) => {
-    if (onlyMismatches && row.correct) return false;
+    if (!state.outcomes.has(row.outcome)) return false;
     if (rule && row.rule_id !== rule) return false;
     return true;
   });
@@ -96,7 +139,7 @@ function renderList() {
 
     const badge = document.createElement("span");
     badge.className = "badge outcome-" + row.outcome;
-    badge.textContent = row.outcome;
+    badge.textContent = outcomeLabel(row.outcome);
 
     const rule = document.createElement("span");
     rule.className = "rule";
@@ -151,7 +194,7 @@ function renderMeta(row) {
     if (label === "outcome") {
       const badge = document.createElement("span");
       badge.className = "badge outcome-" + value;
-      badge.textContent = value;
+      badge.textContent = outcomeLabel(value);
       td.appendChild(badge);
     } else {
       td.textContent = value;

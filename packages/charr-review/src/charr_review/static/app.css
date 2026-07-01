@@ -38,11 +38,34 @@ body {
   background: #eee;
 }
 
-.toggle {
+.filters {
   display: flex;
   align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
+  padding: 1px 8px;
+  border-radius: 4px;
   cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.filter-chip input {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* An unchecked outcome is dimmed so the active filter set reads at a glance. */
+.filter-chip.off {
+  opacity: 0.4;
 }
 
 #warnings {
@@ -111,7 +134,14 @@ main {
   color: #14620f;
 }
 
-.outcome-TN {
+/* Exact true negative (predicted == truth): light blue, distinct from the green TP so an exact agreement reads clearly. */
+.outcome-TN_EXACT {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+/* Loose true negative (both non-fail but different, e.g. pass vs not_applicable): grey - counts as TN, not an exact match. */
+.outcome-TN_LOOSE {
   background: #e8e8e8;
   color: #444;
 }

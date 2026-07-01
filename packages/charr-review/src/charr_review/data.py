@@ -31,12 +31,19 @@ class SubstrateRecord(BaseModel):
 
 
 class Outcome(StrEnum):
-  """The per-row confusion outcome on the ``fail`` (violation) positive class, plus an error bucket."""
+  """The per-row confusion outcome on the ``fail`` (violation) positive class, plus an error bucket.
+
+  The true-negative case is split so the UI can tell an exact agreement from a merely-both-non-``fail`` one:
+  ``TN_EXACT`` is ``predicted == truth`` (e.g. ``pass``/``pass``); ``TN_LOOSE`` is both non-``fail`` but different
+  (``pass`` vs ``not_applicable``). Both count as a non-detection for ``fail``-class metrics (docs/adr/0017), but only
+  ``TN_EXACT`` is an exact match.
+  """
 
   TP = "TP"
   FP = "FP"
   FN = "FN"
-  TN = "TN"
+  TN_EXACT = "TN_EXACT"
+  TN_LOOSE = "TN_LOOSE"
   ERROR = "ERROR"
 
 
@@ -96,13 +103,17 @@ def classify(truth: Verdict, predicted: Verdict | None) -> Outcome:
 
   :param truth: The ground-truth verdict from the manifest label.
   :param predicted: The checker's verdict, or ``None`` for the error bucket.
-  :return: ``ERROR`` when there is no prediction, else ``TP``/``FN`` when truth is ``fail`` and ``FP``/``TN`` otherwise.
+  :return: ``ERROR`` when there is no prediction; ``TP``/``FN`` when truth is ``fail``; ``FP`` when a non-``fail`` truth
+    is predicted ``fail``; else ``TN_EXACT`` when the two agree exactly or ``TN_LOOSE`` when both are non-``fail`` but
+    differ.
   """
   if predicted is None:
     return Outcome.ERROR
   if truth is Verdict.FAIL:
     return Outcome.TP if predicted is Verdict.FAIL else Outcome.FN
-  return Outcome.FP if predicted is Verdict.FAIL else Outcome.TN
+  if predicted is Verdict.FAIL:
+    return Outcome.FP
+  return Outcome.TN_EXACT if predicted == truth else Outcome.TN_LOOSE
 
 
 def resolve_image_path(dataset_dir: Path, image: str) -> Path | None:
@@ -145,10 +156,12 @@ def _read_substrate(path: Path) -> list[SubstrateRecord]:
 
 
 def _summarize(rows: list[ReviewRow]) -> dict[str, int]:
+  # Per-outcome counts plus a total. There is deliberately no bundled "mismatches" figure: it conflated a fail-class
+  # error (FP/FN) with a merely-loose true negative, which is exactly the distinction the outcome filter now makes
+  # explicit.
   counts = Counter(row.outcome.value for row in rows)
   summary = {outcome.value: counts.get(outcome.value, 0) for outcome in Outcome}
   summary["total"] = len(rows)
-  summary["mismatches"] = sum(1 for row in rows if not row.correct)
   return summary
 
 
