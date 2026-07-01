@@ -29,6 +29,7 @@ def test_classify_covers_every_confusion_outcome() -> None:
   assert classify(PASS, FAIL) is Outcome.FP
   assert classify(PASS, PASS) is Outcome.TN_EXACT
   assert classify(NA, NA) is Outcome.TN_EXACT
+  assert classify(PASS, NA) is Outcome.TN_LOOSE
   assert classify(FAIL, None) is Outcome.ERROR
 
 

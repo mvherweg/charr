@@ -13,7 +13,9 @@ const OUTCOMES = [
   { key: "TN_LOOSE", label: "TN (loose)" },
   { key: "ERROR", label: "ERROR" },
 ];
-// Default view: the fail-class errors plus the error bucket - the old "only mismatches / errors" set, now explicit.
+// Default view: the fail-class errors plus the error bucket (FP/FN/ERROR). This intentionally differs from the old
+// "only mismatches" filter, which keyed off !correct and so also surfaced pass<->not_applicable rows; those are now
+// TN_LOOSE and hidden by default - the fix for #35. Untick a chip to hide it, tick TP/TN to bring correct rows back.
 const DEFAULT_OUTCOMES = ["FP", "FN", "ERROR"];
 
 function outcomeLabel(key) {
