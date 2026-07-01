@@ -27,15 +27,23 @@ def test_classify_covers_every_confusion_outcome() -> None:
   assert classify(FAIL, FAIL) is Outcome.TP
   assert classify(FAIL, PASS) is Outcome.FN
   assert classify(PASS, FAIL) is Outcome.FP
-  assert classify(PASS, PASS) is Outcome.TN
-  assert classify(NA, NA) is Outcome.TN
+  assert classify(PASS, PASS) is Outcome.TN_EXACT
+  assert classify(NA, NA) is Outcome.TN_EXACT
+  assert classify(PASS, NA) is Outcome.TN_LOOSE
   assert classify(FAIL, None) is Outcome.ERROR
 
 
-def test_pass_versus_not_applicable_is_a_mismatch_even_though_the_outcome_is_tn(make_review: MakeReview) -> None:
+def test_classify_splits_true_negatives_into_exact_and_loose() -> None:
+  # Both non-fail but different verdicts are a loose TN; identical non-fail verdicts are an exact TN.
+  assert classify(PASS, NA) is Outcome.TN_LOOSE
+  assert classify(NA, PASS) is Outcome.TN_LOOSE
+  assert classify(PASS, PASS) is Outcome.TN_EXACT
+
+
+def test_pass_versus_not_applicable_is_a_loose_tn_and_not_an_exact_match(make_review: MakeReview) -> None:
   substrate, dataset = make_review([_record("has-title", PASS, NA)])
   row = load_rows(substrate, dataset).rows[0]
-  assert row.outcome is Outcome.TN
+  assert row.outcome is Outcome.TN_LOOSE
   assert row.correct is False
 
 
