@@ -39,19 +39,19 @@ def test_runner_records_one_substrate_entry_per_image_and_rule(
   records = [_record("images/a.png", {"has-title": Verdict.FAIL, "axes-labeled": Verdict.PASS})]
   manifest = make_dataset(records)
   client = _FakeClient({"a.png": {"has-title": Verdict.FAIL, "axes-labeled": Verdict.PASS}})
-  substrate = evaluate_manifest(manifest, client=client, config=Config())
+  substrate = evaluate_manifest(manifest, name="config-00", client=client, config=Config())
   assert len(substrate) == 2
   by_rule = {entry.rule_id: entry for entry in substrate}
   assert by_rule["has-title"].truth is Verdict.FAIL
   assert by_rule["has-title"].predicted is Verdict.FAIL
-  assert by_rule["has-title"].manifest == "labels"
+  assert by_rule["has-title"].manifest == "config-00"  # the runner stamps the caller-supplied name verbatim
   assert by_rule["has-title"].error is None
 
 
 def test_runner_captures_disagreement(make_dataset: Callable[[Sequence[ManifestRecord]], Path]) -> None:
   manifest = make_dataset([_record("images/a.png", {"has-title": Verdict.FAIL})])
   client = _FakeClient({"a.png": {"has-title": Verdict.PASS}})  # checker misses the violation
-  [entry] = evaluate_manifest(manifest, client=client, config=Config())
+  [entry] = evaluate_manifest(manifest, name="config-00", client=client, config=Config())
   assert entry.truth is Verdict.FAIL
   assert entry.predicted is Verdict.PASS
 
@@ -60,7 +60,7 @@ def test_runner_folds_a_checker_error_into_the_error_bucket(
   make_dataset: Callable[[Sequence[ManifestRecord]], Path],
 ) -> None:
   manifest = make_dataset([_record("images/a.png", {"has-title": Verdict.FAIL})])
-  [entry] = evaluate_manifest(manifest, client=_ExplodingClient(), config=Config())
+  [entry] = evaluate_manifest(manifest, name="config-00", client=_ExplodingClient(), config=Config())
   assert entry.predicted is None
   assert entry.error is not None
 
@@ -68,6 +68,6 @@ def test_runner_folds_a_checker_error_into_the_error_bucket(
 def test_runner_marks_a_missing_image_as_an_error(tmp_path: Path) -> None:
   manifest = tmp_path / "labels.jsonl"
   manifest.write_text(_record("images/missing.png", {"has-title": Verdict.PASS}).model_dump_json() + "\n", "ascii")
-  [entry] = evaluate_manifest(manifest, client=_FakeClient({}), config=Config())
+  [entry] = evaluate_manifest(manifest, name="config-00", client=_FakeClient({}), config=Config())
   assert entry.predicted is None
   assert "not found" in (entry.error or "")

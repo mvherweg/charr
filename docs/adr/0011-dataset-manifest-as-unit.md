@@ -41,6 +41,10 @@ within it is a recommended convention for self-containment, nothing more.
 
 The manifest's on-disk encoding is decided separately in [ADR-0012](0012-manifest-encoding-jsonl.md).
 
+How `charr-eval` is pointed at manifests (files or directories) and how it derives each manifest's per-manifest display
+name is refined in [ADR-0024](0024-eval-manifest-discovery-and-naming.md); that ADR does not supersede this one - the
+manifest-as-unit decision stands.
+
 Alternatives considered:
 
 - **Per-image sidecars** (`chart.png` + a labels file beside each): rejected. File proliferation, no single overview, no
